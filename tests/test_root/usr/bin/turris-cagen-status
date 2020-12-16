@@ -1,0 +1,27 @@
+#!/bin/sh
+
+echo "#### CA $1 ####"
+
+CA_PATH="/tmp/test-cagen/$1"
+
+if [ ! -d "$CA_PATH" ]; then
+    echo "status: missing"
+    exit
+fi
+
+if [ ! -f "$CA_PATH/ca" ]; then
+    echo "status: generating"
+    exit
+fi
+
+echo "status: ready"
+echo "## Certs:"
+for file in "$CA_PATH"/??-* ; do
+    id=$(echo $(basename $file) | cut -d- -f 1)
+    name=$(echo $(basename $file) | cut -d- -f 2)
+    type=$(echo $(basename $file) | cut -d- -f 3)
+    if [ -n "$type" ]; then
+        status=$(cat "$file" | xargs echo -n)
+        echo "$id $type $name $status"
+    fi
+done

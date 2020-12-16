@@ -1,0 +1,11 @@
+config zone 'turris_vpn_client'
+        option name 'tr_vpn_cl'
+        option input 'REJECT'
+        option output 'ACCEPT'
+        option forward 'REJECT'
+        option masq '1'
+
+config forwarding 'turris_vpn_client_forward'
+        option src 'lan'
+        option dest 'tr_vpn_cl'
+

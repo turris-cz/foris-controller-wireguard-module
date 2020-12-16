@@ -1,0 +1,611 @@
+{
+    "definitions": {
+        "client_id": {"type": "string", "pattern": "^[a-zA-Z0-9_]{1,50}$"},
+        "client_get": {
+            "type": "object",
+            "properties": {
+                "id": {"$ref": "#/definitions/client_id"},
+                "enabled": {"type": "boolean"},
+                "running": {"type": "boolean"}
+            },
+            "additionalProperties": false,
+            "required": ["id", "enabled", "running"]
+        },
+        "client_set": {
+            "type": "object",
+            "properties": {
+                "id": {"$ref": "#/definitions/client_id"},
+                "enabled": {"type": "boolean"}
+            },
+            "additionalProperties": false,
+            "required": ["id", "enabled"]
+        },
+        "remote_get": {
+            "type": "object",
+            "properties": {
+                "id": {"$ref": "#/definitions/client_id"},
+                "enabled": {"type": "boolean"},
+                "running": {"type": "boolean"}
+            },
+            "additionalProperties": false,
+            "required": ["id", "enabled", "running"]
+        },
+        "remote_set": {
+            "type": "object",
+            "properties": {
+                "id": {"$ref": "#/definitions/client_id"},
+                "enabled": {"type": "boolean"}
+            },
+            "additionalProperties": false,
+            "required": ["id", "enabled"]
+        },
+        "client_add": {
+            "type": "object",
+            "properties": {
+                "id": {"$ref": "#/definitions/client_id"}
+            },
+            "additionalProperties": false,
+            "required": ["id"]
+        },
+        "client_export": {
+            "type": "object",
+            "properties": {
+                "client": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"$ref": "#/definitions/client_id"},
+                        "private-key": {"type": "string"},
+                        "addresses": {
+                            "type": "array",
+                            "items": {
+                                "oneOf": [
+                                    { "format": "ipv6prefix", "type": "string" },
+                                    { "format": "ipv4prefix", "type": "string" }
+                                ]
+                            }
+                        }
+                    },
+                    "additionalProperties": false,
+                    "required": ["id", "private-key", "addresses"]
+                },
+                "server": {
+                    "type": "object",
+                    "properties": {
+                        "serial-number": {"type": "string"},
+                        "preshared-key": {"type": "string"},
+                        "public-key": {"type": "string"},
+                        "address": {
+                            "oneOf": [
+                                { "format": "ipv4", "type": "string" },
+                                { "format": "ipv6", "type": "string" }
+                            ]
+                        },
+                        "port": {"type": "integer", "minimum": 1, "maximum": 65535},
+                        "networks": {
+                            "type": "array",
+                            "items": {
+                                "oneOf": [
+                                    { "format": "ipv6prefix", "type": "string" },
+                                    { "format": "ipv4prefix", "type": "string" }
+                                ]
+                            }
+                        },
+                        "dns": {
+                            "type": "array",
+                            "items": {
+                                "oneOf": [
+                                    { "format": "ipv4", "type": "string" },
+                                    { "format": "ipv6", "type": "string" }
+                                ]
+                            }
+                        }
+                    },
+                    "additionalProperties": false,
+                    "required": ["serial-number", "preshared-key", "public-key", "address", "port", "networks", "dns"]
+                }
+            },
+            "additionalProperties": false,
+            "required": ["server", "client"]
+        },
+        "client_export_imported": {
+            "type": "object",
+            "properties": {
+                "id": {"$ref": "#/definitions/client_id"},
+                "TODO": {"type": "boolean"}
+            },
+            "additionalProperties": false,
+            "required": ["id", "TODO"]
+        },
+        "server_update_settings": {
+            "type": "object",
+            "properties": {
+                "enabled": {"type": "boolean"},
+                "todo": {"type": "boolean"}
+            },
+            "additionalProperties": false,
+            "required": ["todo", "enabled"]
+        },
+        "server_get_settings": {
+            "type": "object",
+            "properties": {
+                "enabled": {"type": "boolean"},
+                "todo": {"type": "boolean"}
+            },
+            "additionalProperties": false,
+            "required": ["todo", "enabled"]
+        }
+    },
+    "oneOf": [
+        {
+            "description": "Request to generate server key",
+            "properties": {
+                "module": {"enum": ["wireguard"]},
+                "kind": {"enum": ["request"]},
+                "action": {"enum": ["server_generate_keys"]}
+            },
+            "additionalProperties": false
+        },
+        {
+            "description": "Response to generate server key",
+            "properties": {
+                "module": {"enum": ["wireguard"]},
+                "kind": {"enum": ["reply"]},
+                "action": {"enum": ["server_generate_keys"]},
+                "data": {
+                    "type": "object",
+                    "properties": {
+                        "result": {"type": "boolean"}
+                    },
+                    "additionalProperties": false,
+                    "required": ["result"]
+                }
+            },
+            "additionalProperties": false,
+            "required": ["data"]
+        },
+        {
+            "description": "Notification that server key was generated",
+            "properties": {
+                "module": {"enum": ["wireguard"]},
+                "kind": {"enum": ["notification"]},
+                "action": {"enum": ["server_generate_keys"]}
+            },
+            "additionalProperties": false
+        },
+        {
+            "description": "To delete server keys",
+            "properties": {
+                "module": {"enum": ["wireguard"]},
+                "kind": {"enum": ["request"]},
+                "action": {"enum": ["server_delete_keys"]}
+            },
+            "additionalProperties": false
+        },
+        {
+            "description": "Reply to delete server keys",
+            "properties": {
+                "module": {"enum": ["wireguard"]},
+                "kind": {"enum": ["reply"]},
+                "action": {"enum": ["server_delete_keys"]},
+                "data": {
+                    "type": "object",
+                    "properties": {
+                        "result": {"type": "boolean"}
+                    },
+                    "additionalProperties": false,
+                    "required": ["result"]
+                }
+            },
+            "additionalProperties": false,
+            "required": ["data"]
+        },
+        {
+            "description": "That server keys were deleted",
+            "properties": {
+                "module": {"enum": ["wireguard"]},
+                "kind": {"enum": ["notification"]},
+                "action": {"enum": ["server_delete_keys"]}
+            },
+            "additionalProperties": false
+        },
+        {
+            "description": "Request to update server wireguard settings",
+            "properties": {
+                "module": {"enum": ["wireguard"]},
+                "kind": {"enum": ["request"]},
+                "action": {"enum": ["server_update_settings"]},
+                "data": {"$ref": "#/definitions/server_update_settings"}
+            },
+            "additionalProperties": false,
+            "required": ["data"]
+        },
+        {
+            "description": "Reply to update server wireguard settings",
+            "properties": {
+                "module": {"enum": ["wireguard"]},
+                "kind": {"enum": ["reply"]},
+                "action": {"enum": ["server_delete_keys"]},
+                "data": {
+                    "type": "object",
+                    "properties": {
+                        "result": {"type": "boolean"}
+                    },
+                    "additionalProperties": false,
+                    "required": ["result"]
+                }
+            },
+            "additionalProperties": false,
+            "required": ["data"]
+        },
+        {
+            "description": "Notification that wireguard server settings were updated",
+            "properties": {
+                "module": {"enum": ["wireguard"]},
+                "kind": {"enum": ["notification"]},
+                "action": {"enum": ["server_update_settings"]},
+                "data": {"$ref": "#/definitions/server_update_settings"}
+            },
+            "additionalProperties": false,
+            "required": ["data"]
+        },
+        {
+            "description": "Request to get wireguard settings",
+            "properties": {
+                "module": {"enum": ["wireguard"]},
+                "kind": {"enum": ["request"]},
+                "action": {"enum": ["get_settings"]}
+            },
+            "additionalProperties": false
+        },
+        {
+            "description": "Reply to get wireguard settings",
+            "properties": {
+                "module": {"enum": ["wireguard"]},
+                "kind": {"enum": ["request"]},
+                "action": {"enum": ["get_settings"]},
+                "data": {
+                    "oneOf": [
+                        {
+                            "type": "object",
+                            "properties": {
+                                "ready": {"enum": [true]},
+                                "server": {"$ref": "#/definitions/server_get_settings"},
+                                "clients": {
+                                    "type": "array",
+                                    "items": {"$ref": "#/definitions/client_get"}
+                                }
+                            },
+                            "additionalProperties": false,
+                            "required": [
+                                "ready", "server", "clients"
+                            ]
+                        },
+                        {
+                            "type": "object",
+                            "properties": {
+                                "ready": {"enum": [false]}
+                            },
+                            "additionalProperties": false,
+                            "required": ["ready"]
+                        }
+                    ]
+                }
+            },
+            "additionalProperties": false,
+            "required": ["data"]
+        },
+        {
+            "description": "Request to add a client to wireguard server",
+            "properties": {
+                "module": {"enum": ["wireguard"]},
+                "kind": {"enum": ["request"]},
+                "action": {"enum": ["client_add"]},
+                "data": {"$ref": "#/definitions/client_add"}
+            },
+            "additionalProperties": false,
+            "required": ["data"]
+        },
+        {
+            "description": "Reply to add a client to wireguard server",
+            "properties": {
+                "module": {"enum": ["wireguard"]},
+                "kind": {"enum": ["reply"]},
+                "action": {"enum": ["client_add"]},
+                "data": {
+                    "type": "object",
+                    "properties": {
+                        "result": {"type": "boolean"}
+                    },
+                    "additionalProperties": false,
+                    "required": ["result"]
+                }
+            },
+            "additionalProperties": false,
+            "required": ["data"]
+        },
+        {
+            "description": "Notification that client was added to wireguard server",
+            "properties": {
+                "module": {"enum": ["wireguard"]},
+                "kind": {"enum": ["notification"]},
+                "action": {"enum": ["client_add"]},
+                "data": {"$ref": "#/definitions/client_get"}
+            },
+            "additionalProperties": false,
+            "required": ["data"]
+        },
+        {
+            "description": "Request to remove client from wireguard server",
+            "properties": {
+                "module": {"enum": ["wireguard"]},
+                "kind": {"enum": ["request"]},
+                "action": {"enum": ["client_del"]},
+                "data": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"$ref": "#/definitions/client_id"}
+                    },
+                    "additionalProperties": false,
+                    "required": ["id"]
+                }
+            },
+            "additionalProperties": false,
+            "required": ["data"]
+        },
+        {
+            "description": "Reply to remove client from wireguard server",
+            "properties": {
+                "module": {"enum": ["wireguard"]},
+                "kind": {"enum": ["reply"]},
+                "action": {"enum": ["client_del"]},
+                "data": {
+                    "type": "object",
+                    "properties": {
+                        "result": {"type": "boolean"}
+                    },
+                    "additionalProperties": false,
+                    "required": ["result"]
+                }
+            },
+            "additionalProperties": false,
+            "required": ["data"]
+        },
+        {
+            "description": "Notification that client was removed from wireguard server",
+            "properties": {
+                "module": {"enum": ["wireguard"]},
+                "kind": {"enum": ["notification"]},
+                "action": {"enum": ["client_del"]},
+                "data": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"$ref": "#/definitions/client_id"}
+                    },
+                    "additionalProperties": false,
+                    "required": ["id"]
+                }
+            },
+            "additionalProperties": false,
+            "required": ["data"]
+        },
+        {
+            "description": "Request to update settings of a client of wireguard server",
+            "properties": {
+                "module": {"enum": ["wireguard"]},
+                "kind": {"enum": ["request"]},
+                "action": {"enum": ["client_set"]},
+                "data": {"$ref": "#/definitions/client_set"}
+            },
+            "additionalProperties": false,
+            "required": ["data"]
+        },
+        {
+            "description": "Reply to update settings of a client of wireguard server",
+            "properties": {
+                "module": {"enum": ["wireguard"]},
+                "kind": {"enum": ["reply"]},
+                "action": {"enum": ["client_set"]},
+                "data": {
+                    "type": "object",
+                    "properties": {
+                        "result": {"type": "boolean"}
+                    },
+                    "additionalProperties": false,
+                    "required": ["result"]
+                }
+            },
+            "additionalProperties": false,
+            "required": ["data"]
+        },
+        {
+            "description": "Notification that client was of wireguard server was updated",
+            "properties": {
+                "module": {"enum": ["wireguard"]},
+                "kind": {"enum": ["notification"]},
+                "action": {"enum": ["client_set"]},
+                "data": {"$ref": "#/definitions/client_set"}
+            },
+            "additionalProperties": false,
+            "required": ["data"]
+        },
+        {
+            "description": "Request to export client of wireguard server",
+            "properties": {
+                "module": {"enum": ["wireguard"]},
+                "kind": {"enum": ["request"]},
+                "action": {"enum": ["client_export"]},
+                "data": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"$ref": "#/definitions/client_id"}
+                    },
+                    "additionalProperties": false,
+                    "required": ["id"]
+                }
+            },
+            "additionalProperties": false,
+            "required": ["data"]
+        },
+        {
+            "description": "Reply to export client of wireguard server",
+            "properties": {
+                "module": {"enum": ["wireguard"]},
+                "kind": {"enum": ["reply"]},
+                "action": {"enum": ["client_export"]},
+                "data": {"$ref": "#/definitions/client_export"}
+            },
+            "additionalProperties": false,
+            "required": ["data"]
+        },
+        {
+            "description": "Request to import data to connect to a remote server",
+            "properties": {
+                "module": {"enum": ["wireguard"]},
+                "kind": {"enum": ["request"]},
+                "action": {"enum": ["remote_import"]},
+                "data": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"$ref": "#/definitions/client_id"},
+                        "export": "$ref": "#/definitions/client_export"
+                    },
+                    "additionalProperties": false,
+                    "required": ["id", "export"]
+                }
+            },
+            "additionalProperties": false,
+            "required": ["data"]
+        },
+        {
+            "description": "Request to import data to connect to a remote server",
+            "properties": {
+                "module": {"enum": ["wireguard"]},
+                "kind": {"enum": ["reply"]},
+                "action": {"enum": ["remote_import"]},
+                "data": {
+                    "type": "object",
+                    "properties": {
+                        "result": {"type": "boolean"}
+                    },
+                    "additionalProperties": false,
+                    "required": ["result"]
+                }
+            },
+            "additionalProperties": false,
+            "required": ["data"]
+        },
+        {
+            "description": "Notification that client was of wireguard server was updated",
+            "properties": {
+                "module": {"enum": ["wireguard"]},
+                "kind": {"enum": ["notification"]},
+                "action": {"enum": ["remote_import"]},
+                "data": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"$ref": "#/definitions/client_id"},
+                        "export": "$ref": "#/definitions/client_export_imported"
+                    },
+                    "additionalProperties": false,
+                    "required": ["id", "export"]
+                }
+            },
+            "additionalProperties": false,
+            "required": ["data"]
+        },
+        {
+            "description": "Request to remove remote connection to wireguard server",
+            "properties": {
+                "module": {"enum": ["wireguard"]},
+                "kind": {"enum": ["request"]},
+                "action": {"enum": ["remote_del"]},
+                "data": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"$ref": "#/definitions/client_id"}
+                    },
+                    "additionalProperties": false,
+                    "required": ["id"]
+                }
+            },
+            "additionalProperties": false,
+            "required": ["data"]
+        },
+        {
+            "description": "Reply to remove remote connection to wireguard server",
+            "properties": {
+                "module": {"enum": ["wireguard"]},
+                "kind": {"enum": ["reply"]},
+                "action": {"enum": ["remote_del"]},
+                "data": {
+                    "type": "object",
+                    "properties": {
+                        "result": {"type": "boolean"}
+                    },
+                    "additionalProperties": false,
+                    "required": ["result"]
+                }
+            },
+            "additionalProperties": false,
+            "required": ["data"]
+        },
+        {
+            "description": "Notification that connection to remote server was removed",
+            "properties": {
+                "module": {"enum": ["wireguard"]},
+                "kind": {"enum": ["notification"]},
+                "action": {"enum": ["remote_del"]},
+                "data": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"$ref": "#/definitions/client_id"}
+                    },
+                    "additionalProperties": false,
+                    "required": ["id"]
+                }
+            },
+            "additionalProperties": false,
+            "required": ["data"]
+        },
+        {
+            "description": "Request to update settings connection to remote wireguard server",
+            "properties": {
+                "module": {"enum": ["wireguard"]},
+                "kind": {"enum": ["request"]},
+                "action": {"enum": ["remote_set"]},
+                "data": {"$ref": "#/definitions/remote_set"}
+            },
+            "additionalProperties": false,
+            "required": ["data"]
+        },
+        {
+            "description": "Request to update settings connection to remote wireguard server",
+            "properties": {
+                "module": {"enum": ["wireguard"]},
+                "kind": {"enum": ["reply"]},
+                "action": {"enum": ["remote_set"]},
+                "data": {
+                    "type": "object",
+                    "properties": {
+                        "result": {"type": "boolean"}
+                    },
+                    "additionalProperties": false,
+                    "required": ["result"]
+                }
+            },
+            "additionalProperties": false,
+            "required": ["data"]
+        },
+        {
+            "description": "Notification that connection to remote wireguard server was updated",
+            "properties": {
+                "module": {"enum": ["wireguard"]},
+                "kind": {"enum": ["notification"]},
+                "action": {"enum": ["remote_set"]},
+                "data": {"$ref": "#/definitions/remote_set"}
+            },
+            "additionalProperties": false,
+            "required": ["data"]
+        }
+    ]
+}

@@ -1,0 +1,18 @@
+before_script:
+  - pip install virtualenv
+  - virtualenv -p "$(which python)" /tmp/test
+  - source /tmp/test/bin/activate
+  - pip install .
+
+.base_image: &py3_common
+  image: registry.labs.nic.cz/turris/foris-ci/python3
+
+flake8:
+  <<: *py3_common
+  script:
+    - python setup.py flake8
+
+test_python3:
+  <<: *py3_common
+  script:
+    - python setup.py test --addopts="--backend openwrt --backend mock"

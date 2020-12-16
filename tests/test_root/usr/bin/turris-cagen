@@ -1,0 +1,146 @@
+#!/bin/sh
+
+set -e
+
+SCRIPT="$0"
+DIR=/tmp/test-cagen/
+
+LOCKFILE=
+CA=
+
+gen_sleep() {
+	sleep 1
+}
+
+msg() {
+	echo "$1: $2"
+}
+
+test_active_ca() {
+	if [ -z "$CA" ]; then
+		msg "$1" "no CA active"
+		exit 1
+	fi
+}
+
+test_exists() {
+	if [ ! -e "$DIR"/"$1" ]; then
+		msg "$2" "CA '$1' doesn't exist"
+		exit 1
+	fi
+
+}
+
+do_switch() {
+	test_exists "$1" switch
+	cd "$DIR"/"$1"
+	CA="$1"
+}
+
+do_new_ca() {
+	if [ -e "$DIR"/"$1" ]; then
+		msg new_ca "CA '$1' already exists"
+		exit 1
+	fi
+	mkdir -p "$DIR"/"$1"
+	do_switch "$1"
+}
+
+do_gen_crl() {
+	openssl ca -gencrl -out ca.crl -config "$OPENSSL_CONF"
+}
+
+do_gen_ca() {
+	msg gen_ca "started ($CA)"
+	test_active_ca gen_ca
+	if [ -f "ca" ]; then
+		msg gen_ca "CA '$CA' already created"
+		exit 1
+	fi
+	echo 1 > ca
+	gen_sleep
+	msg gen_ca "finished ($CA)"
+}
+
+do_gen_server() {
+	msg gen_server "started ($1)"
+	test_active_ca gen_server
+	SERIAL=$(cat ca)
+	gen_sleep
+	echo valid > "$(printf '%02X' $SERIAL)-$1-server"
+	echo $((SERIAL+1)) > ca
+	msg gen_server "finished ($1)"
+}
+
+do_gen_client() {
+	msg gen_client "started ($1)"
+	test_active_ca gen_client
+	SERIAL=$(cat ca)
+	gen_sleep
+	echo valid > "$(printf '%02X' $SERIAL)-$1-client"
+	echo $((SERIAL+1)) > ca
+	msg gen_client "finished ($1)"
+}
+
+do_drop_ca() {
+	msg drop_ca "started"
+	if [ "$CA" = "$1" ]; then
+		msg drop_ca "CA '$1' is active and can't be dropped"
+		exit 1
+	fi
+	test_exists "$1" drop_ca
+	rm -rf "$DIR"/"$1"
+	msg drop_ca "finished"
+}
+
+do_revoke() {
+	msg revoke "started ($1)"
+	test_active_ca revoke
+	gen_sleep
+	local revoked="no"
+	for file in "${1}"-* ; do
+		if [ -f "$file" ]; then
+			echo revoked > "$file"
+			revoked="true"
+		fi
+	done
+	if [ "$revoked" = "no" ]; then
+		msg revoke "client id '$1' was not found"
+		exit 1
+	fi
+	msg revoke "finished ($1)"
+}
+
+while [ "$1" ] ; do
+	CMD="$1"
+	shift
+	case "$CMD" in
+		new_ca)
+			do_new_ca "$1"
+			shift
+			;;
+		gen_ca)
+			do_gen_ca
+			;;
+		gen_server)
+			do_gen_server "$1"
+			shift
+			;;
+		gen_client)
+			do_gen_client "$1"
+			shift
+			;;
+		switch)
+			do_switch "$1"
+			shift
+			;;
+		drop_ca)
+			do_drop_ca "$1"
+			shift
+			;;
+		revoke)
+			do_revoke "$1"
+			shift
+			;;
+	esac
+done
