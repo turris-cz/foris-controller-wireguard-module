@@ -224,7 +224,7 @@
             "properties": {
                 "module": {"enum": ["wireguard"]},
                 "kind": {"enum": ["reply"]},
-                "action": {"enum": ["server_delete_keys"]},
+                "action": {"enum": ["server_update_settings"]},
                 "data": {
                     "type": "object",
                     "properties": {
@@ -273,11 +273,15 @@
                                 "clients": {
                                     "type": "array",
                                     "items": {"$ref": "#/definitions/client_get"}
+                                },
+                                "remotes": {
+                                    "type": "array",
+                                    "items": {"$ref": "#/definitions/remote_get"}
                                 }
                             },
                             "additionalProperties": false,
                             "required": [
-                                "ready", "server", "clients"
+                                "ready", "server", "clients", "remotes"
                             ]
                         },
                         {

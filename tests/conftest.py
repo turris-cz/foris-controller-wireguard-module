@@ -17,21 +17,24 @@
 # Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301  USA
 #
 
-import pytest
 import os
+
+import pytest
 
 # load common fixtures
 from foris_controller_testtools.fixtures import (
-    uci_config_default_path,
+    backend,
     cmdline_script_root,
     controller_modules,
-    extra_module_paths,
     env_overrides,
+    extra_module_paths,
     message_bus,
-    backend,
+    uci_config_default_path,
 )
 
-CMDLINE_SCRIPT_ROOT = os.path.join(os.path.dirname(os.path.realpath(__file__)), "test_root")
+CMDLINE_SCRIPT_ROOT = os.path.join(
+    os.path.dirname(os.path.realpath(__file__)), "test_root"
+)
 
 
 @pytest.fixture(scope="module")
@@ -51,7 +54,7 @@ def cmdline_script_root():
 
 @pytest.fixture(scope="module")
 def controller_modules():
-    return ["remote", "openvpn_client"]
+    return ["wireguard"]
 
 
 def pytest_addoption(parser):
