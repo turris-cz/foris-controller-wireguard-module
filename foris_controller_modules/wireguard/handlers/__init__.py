@@ -1,6 +1,6 @@
 #
 # foris-controller-wireguard-module
-# Copyright (C) 2020 CZ.NIC, z.s.p.o. (http://www.nic.cz/)
+# Copyright (C) 2021 CZ.NIC, z.s.p.o. (http://www.nic.cz/)
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,7 +17,7 @@
 # Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301  USA
 #
 
-from .mock import MockWireguardClientHandler
-from .openwrt import OpenwrtWireguardClientHandler
+from .mock import MockWireguardHandler
+from .openwrt import OpenwrtWireguardHandler
 
-__all__ = ["MockWireguardClientHandler", "OpenwrtWireguardClientHandler"]
+__all__ = ["MockWireguardHandler", "OpenwrtWireguardHandler"]

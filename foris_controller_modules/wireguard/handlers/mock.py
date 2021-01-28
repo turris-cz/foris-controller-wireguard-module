@@ -31,25 +31,45 @@ logger = logging.getLogger(__name__)
 class MockWireguardHandler(Handler, BaseMockHandler):
     clients: typing.List[dict] = []
     remotes: typing.List[dict] = []
-    settings = {
-        "ready": False,
+    ready = False
+    server = {
+        "enabled": True,
+        "port": 51820,
+        "network4": "10.12.12.1/24",
     }
 
     @logger_wrapper(logger)
-    def server_generate_keys(self):
-        raise NotImplementedError()
+    def server_generate_keys(self) -> bool:
+        if self.ready is False:
+            self.ready = True
+            return True
+        else:
+            return False
 
     @logger_wrapper(logger)
-    def server_delete_keys(self):
-        raise NotImplementedError()
+    def server_delete_keys(self) -> bool:
+        if self.ready is False:
+            return False
+        else:
+            self.ready = False
+            return True
 
     @logger_wrapper(logger)
     def server_update_settings(self, *args, **kwargs):
         raise NotImplementedError()
 
     @logger_wrapper(logger)
-    def get_settings(self):
-        raise NotImplementedError()
+    def get_settings(self) -> dict:
+        return (
+            {
+                "ready": True,
+                "server": self.server,
+                "clients": self.clients,
+                "remotes": self.remotes,
+            }
+            if self.ready
+            else {"ready": False}
+        )
 
     @logger_wrapper(logger)
     def client_add(self, *args, **kwargs):

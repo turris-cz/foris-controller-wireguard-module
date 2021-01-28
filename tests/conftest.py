@@ -1,6 +1,6 @@
 #
 # foris-controller-openvpn_client-module
-# Copyright (C) 2019 CZ.NIC, z.s.p.o. (http://www.nic.cz/)
+# Copyright (C) 2021 CZ.NIC, z.s.p.o. (http://www.nic.cz/)
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -54,7 +54,7 @@ def cmdline_script_root():
 
 @pytest.fixture(scope="module")
 def controller_modules():
-    return ["wireguard"]
+    return ["remote", "wireguard"]
 
 
 def pytest_addoption(parser):

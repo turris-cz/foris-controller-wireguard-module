@@ -1,6 +1,6 @@
 #
 # foris-controller-wireguard-module
-# Copyright (C) 2020 CZ.NIC, z.s.p.o. (http://www.nic.cz/)
+# Copyright (C) 2021 CZ.NIC, z.s.p.o. (http://www.nic.cz/)
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -43,106 +43,28 @@ from foris_controller_backends.wan import WanStatusCommands
 logger = logging.getLogger(__name__)
 
 
-IF_NAME_LEN = 10  # Interface name has to be less then 14 characters and is always prefixed with 'vpn'
-
-
 def get_interface_name():
-    return f"ws_{app_info['controller_id']}"
-
-
-class WireguardAsync(AsyncCommand):
-    def server_generate_keys(
-        self, notify_function, exit_notify_function, reset_notify_function
-    ):
-        # make sure that directories exists
-        makedirs(str(WireguardFile.SERVER_DIR))
-
-        server_key = str(WireguardFile.server_key())
-        server_pub = str(WireguardFile.server_pub())
-        server_psk = str(WireguardFile.server_psk())
-
-        def handler_exit(process_data):
-            exit_notify_function(
-                {
-                    "task_id": process_data.id,
-                    "status": "succeeded"
-                    if process_data.get_retval() == 0
-                    else "failed",
-                }
-            )
-
-        def gen_handler(status):
-            def handler(matched, process_data):
-                notify_function({"task_id": process_data.id, "status": status})
-
-            return handler
-
-        task_id = self.start_process(
-            [
-                "bash",
-                "-c",
-                f"/usr/bin/wg genkey | tee {inject_file_root(server_key)} | wg pubkey > {inject_file_root(server_pub)}"
-                f"&& wg genpsk > {inject_file_root(server_psk)}",
-            ],
-            [
-                (r"^TODO parse some output if there's any", gen_handler("TODO")),
-            ],
-            handler_exit,
-            reset_notify_function,
-        )
-
-        return task_id
-
-    def generate_client_keys(
-        self, name, notify_function, exit_notify_function, reset_notify_function
-    ):
-        makedirs(str(WireguardFile.CLIENTS_DIR))
-
-        client_key = str(WireguardFile.CLIENTS_DIR / f"{name}.key")
-        client_pub = str(WireguardFile.CLIENTS_DIR / f"{name}.pub")
-
-        def handler_exit(process_data):
-            exit_notify_function(
-                {
-                    "task_id": process_data.id,
-                    "name": name,
-                    "status": "succeeded"
-                    if process_data.get_retval() == 0
-                    else "failed",
-                }
-            )
-
-        def gen_handler(status):
-            def handler(matched, process_data):
-                notify_function(
-                    {"task_id": process_data.id, "status": status, "name": name}
-                )
-
-            return handler
-
-        task_id = self.start_process(
-            [
-                "bash",
-                "-c",
-                f"/usr/bin/wg genkey | tee {inject_file_root(client_key)} | wg pubkey > {inject_file_root(client_pub)}",
-            ],
-            [
-                (r"^TODO parse some output if there's any", gen_handler("TODO")),
-            ],
-            handler_exit,
-            reset_notify_function,
-        )
-
-        return task_id
+    return f"wg_{app_info['controller_id']}"
 
 
 class WireguardCmds(BaseCmdLine):
+    def generate_server_keys(self):
+        WireguardFile.makedirs()
+        # TODO tady jsem skoncil
+        self._run_command_and_check_retval(
+            [
+                "/bin/sh",
+                "-c",
+                f"wg genkey | tee wgserver.key | wg pubkey > wgserver.pub",
+            ],
+            0,
+        )
+
     def get_status(self):
         output, _ = self._run_command_and_check_retval(["/usr/bin/wg", "show"], 0)
         # TODO parse it
-        raise NotImplementedError
         server_interface = get_interface_name()
-
+        raise NotImplementedError
         return {"server": {}, "clients": []}
 
 
@@ -150,6 +72,11 @@ class WireguardFile(BaseFile):
     ROOT_DIR = pathlib.Path("/etc/wireguard/")
     SERVER_DIR = ROOT_DIR / "server"
     CLIENTS_DIR = ROOT_DIR / "clients"
+
+    @staticmethod
+    def makedirs():
+        WireguardFile.SERVER_DIR.mkdir(parents=True, exist_ok=True)
+        WireguardFile.CLIENTS_DIR.mkdir(parents=True, exist_ok=True)
 
     @staticmethod
     def server_key() -> pathlib.Path:

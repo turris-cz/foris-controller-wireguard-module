@@ -129,10 +129,11 @@
             "type": "object",
             "properties": {
                 "enabled": {"type": "boolean"},
-                "todo": {"type": "boolean"}
+                "network4": {"type": "string", "format": "ipv4prefix"},
+                "port": {"type": "integer", "minimum": 1, "maximum": 65535}
             },
             "additionalProperties": false,
-            "required": ["todo", "enabled"]
+            "required": ["enabled", "network4", "port"]
         }
     },
     "oneOf": [
@@ -261,7 +262,7 @@
             "description": "Reply to get wireguard settings",
             "properties": {
                 "module": {"enum": ["wireguard"]},
-                "kind": {"enum": ["request"]},
+                "kind": {"enum": ["reply"]},
                 "action": {"enum": ["get_settings"]},
                 "data": {
                     "oneOf": [
@@ -471,7 +472,7 @@
                     "type": "object",
                     "properties": {
                         "id": {"$ref": "#/definitions/client_id"},
-                        "export": "$ref": "#/definitions/client_export"
+                        "export": {"$ref": "#/definitions/client_export"}
                     },
                     "additionalProperties": false,
                     "required": ["id", "export"]
@@ -508,7 +509,7 @@
                     "type": "object",
                     "properties": {
                         "id": {"$ref": "#/definitions/client_id"},
-                        "export": "$ref": "#/definitions/client_export_imported"
+                        "export": {"$ref": "#/definitions/client_export_imported"}
                     },
                     "additionalProperties": false,
                     "required": ["id", "export"]

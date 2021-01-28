@@ -48,6 +48,7 @@ class OpenwrtWireguardHandler(Handler, BaseOpenwrtHandler):
 
     @logger_wrapper(logger)
     def server_delete_keys(self):
+        # TODO test whether the server is not runnig
         raise NotImplementedError()
 
     @logger_wrapper(logger)

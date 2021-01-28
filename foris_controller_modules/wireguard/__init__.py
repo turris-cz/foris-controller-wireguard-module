@@ -1,6 +1,6 @@
 #
 # foris-controller-wireguard-module
-# Copyright (C) 2020 CZ.NIC, z.s.p.o. (http://www.nic.cz/)
+# Copyright (C) 2021 CZ.NIC, z.s.p.o. (http://www.nic.cz/)
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -27,13 +27,11 @@ class WireguardModule(BaseModule):
     logger = logging.getLogger(__name__)
 
     def action_server_generate_keys(self, data):
-        def notify(msg):
-            self.notify("server_generate_keys", msg)
+        res = self.handler.server_generate_keys()
+        if res:
+            self.notify("server_generate_keys")
 
-        # notify and exit notify are the same
-        async_id = self.handler.server_generate_keys(notify, notify, self.reset_notify)
-
-        return {"task_id": async_id}
+        return {"result": res}
 
     def action_server_delete_keys(self, data):
         res = self.handler.server_delete_keys()
@@ -53,7 +51,9 @@ class WireguardModule(BaseModule):
             self.notify("client_add", msg)
 
         # notify and exit notify are the same
-        async_id = self.handler.client_add(data["name"], notify, notify, self.reset_notify)
+        async_id = self.handler.client_add(
+            data["name"], notify, notify, self.reset_notify
+        )
 
         return {"task_id": async_id}
 
