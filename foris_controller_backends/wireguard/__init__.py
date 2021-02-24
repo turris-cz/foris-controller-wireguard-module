@@ -26,13 +26,19 @@ import re
 import typing
 
 from foris_controller.app import app_info
-from foris_controller_backends.cmdline import AsyncCommand, BaseCmdLine
-from foris_controller_backends.files import BaseFile, inject_file_root, makedirs
+from foris_controller_backends.cmdline import BaseCmdLine
+from foris_controller_backends.files import (
+    BaseFile,
+    inject_file_root,
+    makedirs,
+    path_exists,
+)
 from foris_controller_backends.maintain import MaintainCommands
 from foris_controller_backends.services import OpenwrtServices
 from foris_controller_backends.uci import (
     UciBackend,
     UciException,
+    UciRecordNotFound,
     get_option_named,
     get_sections_by_type,
     parse_bool,
@@ -50,12 +56,19 @@ def get_interface_name():
 class WireguardCmds(BaseCmdLine):
     def generate_server_keys(self):
         WireguardFile.makedirs()
-        # TODO tady jsem skoncil
         self._run_command_and_check_retval(
             [
                 "/bin/sh",
                 "-c",
-                f"wg genkey | tee wgserver.key | wg pubkey > wgserver.pub",
+                f'wg genkey | tee "{inject_file_root(str(WireguardFile.server_key()))}" | wg pubkey > "{inject_file_root(str(WireguardFile.server_pub()))}"',
+            ],
+            0,
+        )
+        self._run_command_and_check_retval(
+            [
+                "/bin/sh",
+                "-c",
+                f'wg genpsk > "{inject_file_root(str(WireguardFile.server_psk()))}"',
             ],
             0,
         )
@@ -74,9 +87,28 @@ class WireguardFile(BaseFile):
     CLIENTS_DIR = ROOT_DIR / "clients"
 
     @staticmethod
+    def keys_ready(any_ready=False):
+        if any_ready:
+            return (
+                path_exists(str(WireguardFile.server_key()))
+                or path_exists(str(WireguardFile.server_pub()))
+                or path_exists(str(WireguardFile.server_psk()))
+            )
+        else:
+            return (
+                path_exists(str(WireguardFile.server_key()))
+                and path_exists(str(WireguardFile.server_pub()))
+                and path_exists(str(WireguardFile.server_psk()))
+            )
+
+    @staticmethod
     def makedirs():
-        WireguardFile.SERVER_DIR.mkdir(parents=True, exist_ok=True)
-        WireguardFile.CLIENTS_DIR.mkdir(parents=True, exist_ok=True)
+        pathlib.Path(inject_file_root(str(WireguardFile.SERVER_DIR))).mkdir(
+            parents=True, exist_ok=True
+        )
+        pathlib.Path(inject_file_root(str(WireguardFile.CLIENTS_DIR))).mkdir(
+            parents=True, exist_ok=True
+        )
 
     @staticmethod
     def server_key() -> pathlib.Path:
@@ -95,80 +127,48 @@ class WireguardFile(BaseFile):
         self.delete_file(str(WireguardFile.server_key()))
         self.delete_file(str(WireguardFile.server_pub()))
         self.delete_file(str(WireguardFile.server_psk()))
-        self.delete_directory(WireguardFile.CLIENTS_DIR)
+        self.delete_directory(str(WireguardFile.CLIENTS_DIR))
 
 
 class WireguardUci:
     DEFAULTS = {
         "enabled": False,
-        "network": "10.222.222.0",
-        "network_netmask": "255.255.255.0",
-        "routes": [],
+        "network4": ["10.211.211.0/24"],
         "port": 51820,
-        "route_all": False,
-        "use_dns": False,
+        # "routes": [],
+        # "route_all": False,
+        # "use_dns": False,
     }
 
-    def get_settings(self):
-        raise NotImplementedError
+    def get_settings(self) -> dict:
+        if not WireguardFile.keys_ready():
+            return {"ready": False}
+
+        result = {
+            "ready": True,
+            "server": {},
+            "clients": [],
+            "remotes": [],
+        }
         with UciBackend() as backend:
-            data = backend.read("openvpn")
-            foris_data = backend.read("foris")
+            data = backend.read("network")
 
         try:
-            enabled = parse_bool(
-                get_option_named(data, "openvpn", "server_turris", "enabled", "0")
+            interface = get_interface_name()
+            result["server"]["enabled"] = parse_bool(
+                get_option_named(data, "network", interface, "enabled", "0")
             )
-            network, network_netmask = get_option_named(
-                data, "openvpn", "server_turris", "server", "10.111.111.0 255.255.255.0"
-            ).split()
-            push_options = get_option_named(
-                data, "openvpn", "server_turris", "push", []
-            )
-            routes = [
-                dict(
-                    zip(("network", "netmask"), e.split()[1:])
-                )  # `route <network> <netmask>`
-                for e in push_options
-                if e.startswith("route ")
-            ]
-            device = get_option_named(data, "openvpn", "server_turris", "dev", "")
-            protocol = get_option_named(
-                data, "openvpn", "server_turris", "proto", "udp"
-            )
-            ipv6 = "6" in protocol  # tcp6, tcp6-server, udp6
-            protocol = "tcp" if protocol.startswith("tcp") else "udp"
-            port = int(get_option_named(data, "openvpn", "server_turris", "port", "0"))
-            use_dns = (
-                True
-                if [e for e in push_options if e.startswith("dhcp-option DNS")]
-                else False
-            )
-            route_all = (
-                True
-                if [e for e in push_options if e == "redirect-gateway def1"]
-                else False
-            )
-            server_hostname = get_option_named(
-                foris_data, "foris", "openvpn_plugin", "server_address", ""
+            result["server"]["network4"] = get_option_named(
+                data,
+                "network",
+                interface,
+                "network4",
             )
 
-        except UciException:
-            return WireguardUci.DEFAULTS
+        except (UciException, UciRecordNotFound):
+            result["server"] = WireguardUci.DEFAULTS
 
-        return {
-            "enabled": enabled,
-            "network": network,
-            "network_netmask": network_netmask,
-            "routes": routes,
-            "device": device,
-            "protocol": protocol,
-            "port": port,
-            "route_all": route_all,
-            "use_dns": use_dns,
-            "server_hostname": server_hostname,
-            "ipv6": ipv6,
-        }
+        return result
 
     def server_update_settings(
         self,

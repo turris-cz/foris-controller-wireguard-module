@@ -22,41 +22,46 @@ import typing
 
 from foris_controller.handler_base import BaseOpenwrtHandler
 from foris_controller.utils import logger_wrapper
+from foris_controller_backends.wireguard import (
+    WireguardCmds,
+    WireguardFile,
+    WireguardUci,
+)
 
 from .. import Handler
-
-# from foris_controller_backends.wireguard import (
-#    WireguardCmds,
-#    WireguardFiles,
-#    WireguardUci,
-# )
-
 
 logger = logging.getLogger(__name__)
 
 
 class OpenwrtWireguardHandler(Handler, BaseOpenwrtHandler):
 
-    # asynchronous = WireguardAsync()
-    # cmds = WireguardCmds()
-    # files = WireguardFile()
-    # uci = WireguardUci()
+    cmds = WireguardCmds()
+    files = WireguardFile()
+    uci = WireguardUci()
 
     @logger_wrapper(logger)
-    def server_generate_keys(self):
-        raise NotImplementedError()
+    def server_generate_keys(self) -> bool:
+        if self.files.keys_ready():
+            return False
+        else:
+            self.cmds.generate_server_keys()
+            return True
 
     @logger_wrapper(logger)
-    def server_delete_keys(self):
-        # TODO test whether the server is not runnig
-        raise NotImplementedError()
+    def server_delete_keys(self) -> bool:
+        if self.files.keys_ready(any_ready=True):
+            # if some keys are missing => clean it anyway
+            self.files.server_delete_keys()
+            return True
+        else:
+            return False
+
+    @logger_wrapper(logger)
+    def get_settings(self) -> dict:
+        return self.uci.get_settings()
 
     @logger_wrapper(logger)
     def server_update_settings(self, *args, **kwargs):
-        raise NotImplementedError()
-
-    @logger_wrapper(logger)
-    def get_settings(self):
         raise NotImplementedError()
 
     @logger_wrapper(logger)
