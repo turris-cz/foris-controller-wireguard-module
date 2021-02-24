@@ -18,7 +18,6 @@
 #
 
 import logging
-import typing
 
 from foris_controller.handler_base import BaseOpenwrtHandler
 from foris_controller.utils import logger_wrapper
@@ -61,8 +60,8 @@ class OpenwrtWireguardHandler(Handler, BaseOpenwrtHandler):
         return self.uci.get_settings()
 
     @logger_wrapper(logger)
-    def server_update_settings(self, *args, **kwargs):
-        raise NotImplementedError()
+    def server_update_settings(self, enabled, networks=None, port=None) -> bool:
+        return self.uci.server_update_settings(enabled, networks, port)
 
     @logger_wrapper(logger)
     def client_add(self, *args, **kwargs):

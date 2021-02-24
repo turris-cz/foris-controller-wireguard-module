@@ -33,9 +33,9 @@ class MockWireguardHandler(Handler, BaseMockHandler):
     remotes: typing.List[dict] = []
     ready = False
     server = {
-        "enabled": True,
+        "enabled": False,
         "port": 51820,
-        "network4": "10.12.12.1/24",
+        "networks": ["10.211.211.0/24"],
     }
 
     @logger_wrapper(logger)
@@ -55,8 +55,11 @@ class MockWireguardHandler(Handler, BaseMockHandler):
             return True
 
     @logger_wrapper(logger)
-    def server_update_settings(self, *args, **kwargs):
-        raise NotImplementedError()
+    def server_update_settings(self, enabled, networks=None, port=None) -> bool:
+        self.server["enabled"] = enabled
+        self.server["networks"] = networks or self.server["networks"]
+        self.server["port"] = port or self.server["port"]
+        return True
 
     @logger_wrapper(logger)
     def get_settings(self) -> dict:

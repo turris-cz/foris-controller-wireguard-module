@@ -1,6 +1,16 @@
 {
     "definitions": {
         "client_id": {"type": "string", "pattern": "^[a-zA-Z0-9_]{1,50}$"},
+        "networks": {
+            "type": "array",
+            "items": {
+                "oneOf": [
+                    {"type": "string", "format": "ipv4prefix"},
+                    {"type": "string", "format": "ipv6prefix"}
+                ],
+                "minItems": 1
+            }
+        },
         "client_get": {
             "type": "object",
             "properties": {
@@ -116,27 +126,38 @@
             "additionalProperties": false,
             "required": ["id", "TODO"]
         },
-        "server_update_settings": {
-            "type": "object",
-            "properties": {
-                "enabled": {"type": "boolean"},
-                "todo": {"type": "boolean"}
-            },
-            "additionalProperties": false,
-            "required": ["todo", "enabled"]
+        "server_update_settings": 
+        {
+            "oneOf": [
+                {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {"enum": [true]},
+                        "networks": {"$ref": "#/definitions/networks"},
+                        "port": {"type": "integer", "minimum": 1, "maximum": 65535}
+                    },
+                    "additionalProperties": false,
+                    "required": ["enabled", "networks", "port"]
+                },
+                {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {"enum": [false]}
+                    },
+                    "additionalProperties": false,
+                    "required": ["enabled"]
+                }
+            ]
         },
         "server_get_settings": {
             "type": "object",
             "properties": {
                 "enabled": {"type": "boolean"},
-                "network4": {
-                    "type": "array",
-                    "items": {"type": "string", "format": "ipv4prefix"}
-                },
+                "networks": {"$ref": "#/definitions/networks"},
                 "port": {"type": "integer", "minimum": 1, "maximum": 65535}
             },
             "additionalProperties": false,
-            "required": ["enabled", "network4", "port"]
+            "required": ["enabled", "networks", "port"]
         }
     },
     "oneOf": [

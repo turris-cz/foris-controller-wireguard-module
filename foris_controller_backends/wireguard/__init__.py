@@ -50,7 +50,8 @@ logger = logging.getLogger(__name__)
 
 
 def get_interface_name():
-    return f"wg_{app_info['controller_id']}"
+    return "wg_turris"
+    # return f"wg_{app_info['controller_id']}"
 
 
 class WireguardCmds(BaseCmdLine):
@@ -122,6 +123,18 @@ class WireguardFile(BaseFile):
     def server_psk() -> pathlib.Path:
         return WireguardFile.SERVER_DIR / f"{app_info['controller_id']}.psk"
 
+    @staticmethod
+    def server_key_content() -> str:
+        return BaseFile()._file_content(str(WireguardFile.server_key()))
+
+    @staticmethod
+    def server_pub_content() -> str:
+        return BaseFile()._file_content(str(WireguardFile.server_pub()))
+
+    @staticmethod
+    def server_psk_content() -> str:
+        return BaseFile()._file_content(str(WireguardFile.server_psk()))
+
     def server_delete_keys(self):
         """ removes all keys """
         self.delete_file(str(WireguardFile.server_key()))
@@ -133,11 +146,8 @@ class WireguardFile(BaseFile):
 class WireguardUci:
     DEFAULTS = {
         "enabled": False,
-        "network4": ["10.211.211.0/24"],
+        "networks": ["10.211.211.0/24"],
         "port": 51820,
-        # "routes": [],
-        # "route_all": False,
-        # "use_dns": False,
     }
 
     def get_settings(self) -> dict:
@@ -158,11 +168,11 @@ class WireguardUci:
             result["server"]["enabled"] = parse_bool(
                 get_option_named(data, "network", interface, "enabled", "0")
             )
-            result["server"]["network4"] = get_option_named(
+            result["server"]["networks"] = get_option_named(
                 data,
                 "network",
                 interface,
-                "network4",
+                "addresses",
             )
 
         except (UciException, UciRecordNotFound):
@@ -170,218 +180,190 @@ class WireguardUci:
 
         return result
 
-    def server_update_settings(
-        self,
-        enabled,
-        network=None,
-        network_netmask=None,
-        route_all=None,
-        use_dns=None,
-        protocol=None,
-        ipv6=None,
-    ):
-        raise NotImplementedError
+    def server_update_settings(self, enabled, networks=None, port=None) -> bool:
+        if not WireguardFile.keys_ready():
+            return False
+
         with UciBackend() as backend:
+            section = get_interface_name()
             if enabled:
-                network_data = backend.read("network")
-                lan_ip = get_option_named(network_data, "network", "lan", "ipaddr")
-                lan_netmask = get_option_named(
-                    network_data, "network", "lan", "netmask"
+                # networks and port has to be set
+                backend.add_section("network", "interface", section)
+                backend.set_option("network", section, "enabled", store_bool(True))
+                backend.set_option("network", section, "proto", "wireguard")
+                backend.set_option(
+                    "network",
+                    section,
+                    "private_key",
+                    WireguardFile.server_key_content().strip(),
                 )
+                backend.set_option("network", section, "enabled", port)
+                backend.replace_list("network", "section", "network", ["vpn_turris"])
 
-                backend.add_section("network", "interface", "vpn_turris")
-                backend.set_option("network", "vpn_turris", "enabled", store_bool(True))
-                backend.set_option("network", "vpn_turris", "ifname", "tun_turris")
-                backend.set_option("network", "vpn_turris", "proto", "none")
-                backend.set_option("network", "vpn_turris", "auto", store_bool(True))
+    def server_update_settings_old():
+        if enabled:
+            network_data = backend.read("network")
+            lan_ip = get_option_named(network_data, "network", "lan", "ipaddr")
+            lan_netmask = get_option_named(network_data, "network", "lan", "netmask")
 
-                backend.add_section("firewall", "zone", "vpn_turris")
-                backend.set_option(
-                    "firewall", "vpn_turris", "enabled", store_bool(True)
-                )
-                backend.set_option("firewall", "vpn_turris", "name", "vpn_turris")
-                backend.set_option("firewall", "vpn_turris", "input", "ACCEPT")
-                backend.set_option("firewall", "vpn_turris", "forward", "REJECT")
-                backend.set_option("firewall", "vpn_turris", "output", "ACCEPT")
-                backend.set_option("firewall", "vpn_turris", "masq", store_bool(True))
-                backend.replace_list(
-                    "firewall", "vpn_turris", "network", ["vpn_turris"]
-                )
-                backend.add_section("firewall", "rule", "vpn_turris_rule")
-                backend.set_option(
-                    "firewall", "vpn_turris_rule", "enabled", store_bool(True)
-                )
-                backend.set_option(
-                    "firewall", "vpn_turris_rule", "name", "vpn_turris_rule"
-                )
-                backend.set_option("firewall", "vpn_turris_rule", "target", "ACCEPT")
-                backend.set_option("firewall", "vpn_turris_rule", "proto", protocol)
-                backend.set_option("firewall", "vpn_turris_rule", "src", "wan")
-                backend.set_option("firewall", "vpn_turris_rule", "dest_port", "1194")
-                backend.add_section(
-                    "firewall", "forwarding", "vpn_turris_forward_lan_in"
-                )
-                backend.set_option(
-                    "firewall", "vpn_turris_forward_lan_in", "enabled", store_bool(True)
-                )
-                backend.set_option(
-                    "firewall", "vpn_turris_forward_lan_in", "src", "vpn_turris"
-                )
-                backend.set_option(
-                    "firewall", "vpn_turris_forward_lan_in", "dest", "lan"
-                )
-                backend.add_section(
-                    "firewall", "forwarding", "vpn_turris_forward_lan_out"
-                )
-                backend.set_option(
-                    "firewall",
-                    "vpn_turris_forward_lan_out",
-                    "enabled",
-                    store_bool(True),
-                )
-                backend.set_option(
-                    "firewall", "vpn_turris_forward_lan_out", "src", "lan"
-                )
-                backend.set_option(
-                    "firewall", "vpn_turris_forward_lan_out", "dest", "vpn_turris"
-                )
-                backend.add_section(
-                    "firewall", "forwarding", "vpn_turris_forward_wan_out"
-                )
-                backend.set_option(
-                    "firewall",
-                    "vpn_turris_forward_wan_out",
-                    "enabled",
-                    store_bool(True if route_all else False),
-                )
-                backend.set_option(
-                    "firewall", "vpn_turris_forward_wan_out", "src", "vpn_turris"
-                )
-                backend.set_option(
-                    "firewall", "vpn_turris_forward_wan_out", "dest", "wan"
-                )
+            backend.add_section("network", "interface", "vpn_turris")
+            backend.set_option("network", "vpn_turris", "enabled", store_bool(True))
+            backend.set_option("network", "vpn_turris", "ifname", "tun_turris")
+            backend.set_option("network", "vpn_turris", "proto", "none")
+            backend.set_option("network", "vpn_turris", "auto", store_bool(True))
 
-                backend.add_section("openvpn", "openvpn", "server_turris")
-                backend.set_option(
-                    "openvpn", "server_turris", "enabled", store_bool(True)
-                )
-                backend.set_option("openvpn", "server_turris", "port", "1194")
-                if ipv6:
-                    proto = "tcp6-server" if protocol == "tcp" else "udp6"
-                else:
-                    proto = "tcp-server" if protocol == "tcp" else "udp"
-                backend.set_option("openvpn", "server_turris", "proto", proto)
-                backend.set_option("openvpn", "server_turris", "dev", "tun_turris")
-                backend.set_option(
-                    "openvpn", "server_turris", "ca", "/etc/ssl/ca/openvpn/ca.crt"
-                )
-                backend.set_option(
-                    "openvpn",
-                    "server_turris",
-                    "crl_verify",
-                    "/etc/ssl/ca/openvpn/ca.crl",
-                )
-                backend.set_option(
-                    "openvpn", "server_turris", "cert", "/etc/ssl/ca/openvpn/01.crt"
-                )
-                backend.set_option(
-                    "openvpn", "server_turris", "key", "/etc/ssl/ca/openvpn/01.key"
-                )
-                backend.set_option(
-                    "openvpn", "server_turris", "dh", "/etc/ssl/ca/openvpn/dhparam.pem"
-                )
-                backend.set_option(
-                    "openvpn",
-                    "server_turris",
-                    "server",
-                    "%s %s" % (network, network_netmask),
-                )
-                backend.set_option(
-                    "openvpn", "server_turris", "ifconfig_pool_persist", "/tmp/ipp.txt"
-                )
-                backend.set_option(
-                    "openvpn", "server_turris", "duplicate_cn", store_bool(False)
-                )
-                backend.set_option("openvpn", "server_turris", "keepalive", "10 120")
-                backend.set_option(
-                    "openvpn", "server_turris", "persist_key", store_bool(True)
-                )
-                backend.set_option(
-                    "openvpn", "server_turris", "persist_tun", store_bool(True)
-                )
-                backend.set_option(
-                    "openvpn", "server_turris", "status", "/tmp/openvpn-status.log"
-                )
-                backend.set_option("openvpn", "server_turris", "verb", "3")
-                backend.set_option("openvpn", "server_turris", "mute", "20")
-                push = [
-                    "route %s %s"
-                    % (
-                        ipaddress.ip_network(
-                            f"{lan_ip}/{lan_netmask}", False
-                        ).network_address,
-                        lan_netmask,
-                    )
-                ]
-                if route_all:
-                    push.append("redirect-gateway def1")
-                if use_dns:
-                    # 10.111.111.0 -> 10.111.111.1
-                    # TODO this won't work when router ip is set to a different address
-                    push.append(
-                        f"dhcp-option DNS {ipaddress.ip_network(network, False).network_address + 1}"
-                    )
-                backend.replace_list("openvpn", "server_turris", "push", push)
+            backend.add_section("firewall", "zone", "vpn_turris")
+            backend.set_option("firewall", "vpn_turris", "enabled", store_bool(True))
+            backend.set_option("firewall", "vpn_turris", "name", "vpn_turris")
+            backend.set_option("firewall", "vpn_turris", "input", "ACCEPT")
+            backend.set_option("firewall", "vpn_turris", "forward", "REJECT")
+            backend.set_option("firewall", "vpn_turris", "output", "ACCEPT")
+            backend.set_option("firewall", "vpn_turris", "masq", store_bool(True))
+            backend.replace_list("firewall", "vpn_turris", "network", ["vpn_turris"])
+            backend.add_section("firewall", "rule", "vpn_turris_rule")
+            backend.set_option(
+                "firewall", "vpn_turris_rule", "enabled", store_bool(True)
+            )
+            backend.set_option("firewall", "vpn_turris_rule", "name", "vpn_turris_rule")
+            backend.set_option("firewall", "vpn_turris_rule", "target", "ACCEPT")
+            backend.set_option("firewall", "vpn_turris_rule", "proto", protocol)
+            backend.set_option("firewall", "vpn_turris_rule", "src", "wan")
+            backend.set_option("firewall", "vpn_turris_rule", "dest_port", "1194")
+            backend.add_section("firewall", "forwarding", "vpn_turris_forward_lan_in")
+            backend.set_option(
+                "firewall", "vpn_turris_forward_lan_in", "enabled", store_bool(True)
+            )
+            backend.set_option(
+                "firewall", "vpn_turris_forward_lan_in", "src", "vpn_turris"
+            )
+            backend.set_option("firewall", "vpn_turris_forward_lan_in", "dest", "lan")
+            backend.add_section("firewall", "forwarding", "vpn_turris_forward_lan_out")
+            backend.set_option(
+                "firewall",
+                "vpn_turris_forward_lan_out",
+                "enabled",
+                store_bool(True),
+            )
+            backend.set_option("firewall", "vpn_turris_forward_lan_out", "src", "lan")
+            backend.set_option(
+                "firewall", "vpn_turris_forward_lan_out", "dest", "vpn_turris"
+            )
+            backend.add_section("firewall", "forwarding", "vpn_turris_forward_wan_out")
+            backend.set_option(
+                "firewall",
+                "vpn_turris_forward_wan_out",
+                "enabled",
+                store_bool(True if route_all else False),
+            )
+            backend.set_option(
+                "firewall", "vpn_turris_forward_wan_out", "src", "vpn_turris"
+            )
+            backend.set_option("firewall", "vpn_turris_forward_wan_out", "dest", "wan")
 
+            backend.add_section("openvpn", "openvpn", "server_turris")
+            backend.set_option("openvpn", "server_turris", "enabled", store_bool(True))
+            backend.set_option("openvpn", "server_turris", "port", "1194")
+            if ipv6:
+                proto = "tcp6-server" if protocol == "tcp" else "udp6"
             else:
-                backend.add_section("network", "interface", "vpn_turris")
-                backend.set_option(
-                    "network", "vpn_turris", "enabled", store_bool(False)
+                proto = "tcp-server" if protocol == "tcp" else "udp"
+            backend.set_option("openvpn", "server_turris", "proto", proto)
+            backend.set_option("openvpn", "server_turris", "dev", "tun_turris")
+            backend.set_option(
+                "openvpn", "server_turris", "ca", "/etc/ssl/ca/openvpn/ca.crt"
+            )
+            backend.set_option(
+                "openvpn",
+                "server_turris",
+                "crl_verify",
+                "/etc/ssl/ca/openvpn/ca.crl",
+            )
+            backend.set_option(
+                "openvpn", "server_turris", "cert", "/etc/ssl/ca/openvpn/01.crt"
+            )
+            backend.set_option(
+                "openvpn", "server_turris", "key", "/etc/ssl/ca/openvpn/01.key"
+            )
+            backend.set_option(
+                "openvpn", "server_turris", "dh", "/etc/ssl/ca/openvpn/dhparam.pem"
+            )
+            backend.set_option(
+                "openvpn",
+                "server_turris",
+                "server",
+                "%s %s" % (network, network_netmask),
+            )
+            backend.set_option(
+                "openvpn", "server_turris", "ifconfig_pool_persist", "/tmp/ipp.txt"
+            )
+            backend.set_option(
+                "openvpn", "server_turris", "duplicate_cn", store_bool(False)
+            )
+            backend.set_option("openvpn", "server_turris", "keepalive", "10 120")
+            backend.set_option(
+                "openvpn", "server_turris", "persist_key", store_bool(True)
+            )
+            backend.set_option(
+                "openvpn", "server_turris", "persist_tun", store_bool(True)
+            )
+            backend.set_option(
+                "openvpn", "server_turris", "status", "/tmp/openvpn-status.log"
+            )
+            backend.set_option("openvpn", "server_turris", "verb", "3")
+            backend.set_option("openvpn", "server_turris", "mute", "20")
+            push = [
+                "route %s %s"
+                % (
+                    ipaddress.ip_network(
+                        f"{lan_ip}/{lan_netmask}", False
+                    ).network_address,
+                    lan_netmask,
                 )
-                backend.add_section("firewall", "zone", "vpn_turris")
-                backend.set_option(
-                    "firewall", "vpn_turris", "enabled", store_bool(False)
+            ]
+            if route_all:
+                push.append("redirect-gateway def1")
+            if use_dns:
+                # 10.111.111.0 -> 10.111.111.1
+                # TODO this won't work when router ip is set to a different address
+                push.append(
+                    f"dhcp-option DNS {ipaddress.ip_network(network, False).network_address + 1}"
                 )
-                backend.add_section("firewall", "rule", "vpn_turris_rule")
-                backend.set_option(
-                    "firewall", "vpn_turris_rule", "enabled", store_bool(False)
-                )
-                backend.add_section(
-                    "firewall", "forwarding", "vpn_turris_forward_lan_in"
-                )
-                backend.set_option(
-                    "firewall",
-                    "vpn_turris_forward_lan_in",
-                    "enabled",
-                    store_bool(False),
-                )
-                backend.add_section(
-                    "firewall", "forwarding", "vpn_turris_forward_lan_out"
-                )
-                backend.set_option(
-                    "firewall",
-                    "vpn_turris_forward_lan_out",
-                    "enabled",
-                    store_bool(False),
-                )
-                backend.add_section(
-                    "firewall", "forwarding", "vpn_turris_forward_wan_out"
-                )
-                backend.set_option(
-                    "firewall",
-                    "vpn_turris_forward_wan_out",
-                    "enabled",
-                    store_bool(False),
-                )
-                backend.add_section("openvpn", "openvpn", "server_turris")
-                backend.set_option(
-                    "openvpn", "server_turris", "enabled", store_bool(False)
-                )
+            backend.replace_list("openvpn", "server_turris", "push", push)
 
-        with OpenwrtServices() as services:
-            MaintainCommands().restart_network()
-            services.restart("openvpn", delay=3)
+        else:
+            backend.add_section("network", "interface", "vpn_turris")
+            backend.set_option("network", "vpn_turris", "enabled", store_bool(False))
+            backend.add_section("firewall", "zone", "vpn_turris")
+            backend.set_option("firewall", "vpn_turris", "enabled", store_bool(False))
+            backend.add_section("firewall", "rule", "vpn_turris_rule")
+            backend.set_option(
+                "firewall", "vpn_turris_rule", "enabled", store_bool(False)
+            )
+            backend.add_section("firewall", "forwarding", "vpn_turris_forward_lan_in")
+            backend.set_option(
+                "firewall",
+                "vpn_turris_forward_lan_in",
+                "enabled",
+                store_bool(False),
+            )
+            backend.add_section("firewall", "forwarding", "vpn_turris_forward_lan_out")
+            backend.set_option(
+                "firewall",
+                "vpn_turris_forward_lan_out",
+                "enabled",
+                store_bool(False),
+            )
+            backend.add_section("firewall", "forwarding", "vpn_turris_forward_wan_out")
+            backend.set_option(
+                "firewall",
+                "vpn_turris_forward_wan_out",
+                "enabled",
+                store_bool(False),
+            )
+            backend.add_section("openvpn", "openvpn", "server_turris")
+            backend.set_option("openvpn", "server_turris", "enabled", store_bool(False))
 
+        MaintainCommands().restart_network()
         return True
 
     def update_server_hostname(self, server_hostname):
