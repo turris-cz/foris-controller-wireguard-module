@@ -97,7 +97,7 @@ def test_key_management(infrastructure):
     assert res["data"]["ready"] is False, "already deleted"
 
 
-def test_update_settings(infrastructure):
+def test_update_settings(infrastructure, network_restart_command):
     filters = [
         ("wireguard", "server_update_settings"),
     ]

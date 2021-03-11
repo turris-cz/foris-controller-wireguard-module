@@ -50,8 +50,12 @@ logger = logging.getLogger(__name__)
 
 
 def get_interface_name():
-    return "wg_turris"
-    # return f"wg_{app_info['controller_id']}"
+    # return "wg_turris"
+    return f"wg_{app_info['controller_id']}"
+
+
+def get_zone_name():
+    return get_interface_name()
 
 
 class WireguardCmds(BaseCmdLine):
@@ -86,6 +90,7 @@ class WireguardFile(BaseFile):
     ROOT_DIR = pathlib.Path("/etc/wireguard/")
     SERVER_DIR = ROOT_DIR / "server"
     CLIENTS_DIR = ROOT_DIR / "clients"
+    REMOTES_DIR = ROOT_DIR / "remotes"
 
     @staticmethod
     def keys_ready(any_ready=False):
@@ -174,6 +179,9 @@ class WireguardUci:
                 interface,
                 "addresses",
             )
+            result["server"]["port"] = int(
+                get_option_named(data, "network", interface, "listen_port")
+            )
 
         except (UciException, UciRecordNotFound):
             result["server"] = WireguardUci.DEFAULTS
@@ -185,20 +193,84 @@ class WireguardUci:
             return False
 
         with UciBackend() as backend:
-            section = get_interface_name()
+            interface = get_interface_name()
+            zone = get_zone_name()
+            rule = f"{zone}_rule"
+            f_lan_in = f"{zone}_f_lan_in"
+            f_lan_out = f"{zone}_f_lan_out"
+            f_wan_out = f"{zone}_f_wan_out"
+
+            # configure interface
+            backend.add_section("network", "interface", interface)
+            backend.set_option("network", interface, "enabled", store_bool(enabled))
+            backend.set_option("network", interface, "proto", "wireguard")
+            backend.set_option(
+                "network",
+                interface,
+                "private_key",
+                WireguardFile.server_key_content().strip(),
+            )
             if enabled:
-                # networks and port has to be set
-                backend.add_section("network", "interface", section)
-                backend.set_option("network", section, "enabled", store_bool(True))
-                backend.set_option("network", section, "proto", "wireguard")
-                backend.set_option(
-                    "network",
-                    section,
-                    "private_key",
-                    WireguardFile.server_key_content().strip(),
-                )
-                backend.set_option("network", section, "enabled", port)
-                backend.replace_list("network", "section", "network", ["vpn_turris"])
+                backend.set_option("network", interface, "listen_port", port)
+                backend.replace_list("network", interface, "addresses", networks)
+
+            # configure firewall
+
+            # add wg zone
+            backend.add_section("firewall", "zone", zone)
+            backend.set_option("firewall", zone, "enabled", store_bool(enabled))
+            backend.set_option("firewall", zone, "name", zone)
+            backend.set_option("firewall", zone, "input", "ACCEPT")
+            backend.set_option("firewall", zone, "forward", "REJECT")
+            backend.set_option("firewall", zone, "output", "ACCEPT")
+            backend.set_option("firewall", zone, "masq", store_bool(True))
+            backend.replace_list("firewall", zone, "network", [interface])
+
+            # add forwarding
+            backend.add_section("firewall", "forwarding", f_lan_in)
+            backend.set_option("firewall", f_lan_in, "enabled", store_bool(enabled))
+            backend.set_option("firewall", f_lan_in, "src", "lan")
+            backend.set_option("firewall", f_lan_in, "dest", interface)
+
+            backend.add_section("firewall", "forwarding", f_lan_out)
+            backend.set_option("firewall", f_lan_out, "enabled", store_bool(enabled))
+            backend.set_option("firewall", f_lan_out, "src", interface)
+            backend.set_option("firewall", f_lan_out, "dest", "lan")
+
+            backend.add_section("firewall", "forwarding", f_wan_out)
+            backend.set_option("firewall", f_wan_out, "enabled", store_bool(enabled))
+            backend.set_option("firewall", f_wan_out, "src", interface)
+            backend.set_option("firewall", f_wan_out, "dest", "wan")
+
+            # add wan rule
+            backend.add_section("firewall", "rule", rule)
+            backend.set_option("firewall", rule, "enabled", store_bool(enabled))
+            backend.set_option("firewall", rule, "name", zone)
+            backend.set_option("firewall", rule, "target", "ACCEPT")
+            backend.set_option("firewall", rule, "proto", "udp")
+            backend.set_option("firewall", rule, "src", "wan")
+            backend.set_option("firewall", rule, "dest_port", port)
+
+        MaintainCommands().restart_network()
+        return True
+
+    def add_wireguard_remote(self):
+        # TODO create interface similary to when the server is starting
+        # add private key obtained from the server
+        pass
+
+    def add_wireguard_client(self):
+        # TODO
+        interface = get_interface_name()
+        cli_interface = f"client_{interface}"
+
+        # configure wireguard
+        backend.add_section("network", f"wireguard_{interface}", cli_interface)
+        backend.set_option("network", cli_interface, "public_key", store_bool(enabled))
+        backend.set_option(
+            "network", cli_interface, "preshared_key", store_bool(enabled)
+        )
+        backend.replace_list("network", cli_interface, "allowed_ips", networks)
 
     def server_update_settings_old():
         if enabled:
