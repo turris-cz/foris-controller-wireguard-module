@@ -7,19 +7,19 @@
                 "oneOf": [
                     {"type": "string", "format": "ipv4prefix"},
                     {"type": "string", "format": "ipv6prefix"}
-                ],
-                "minItems": 1
-            }
+                ]
+            },
+            "minItems": 1
         },
         "client_get": {
             "type": "object",
             "properties": {
                 "id": {"$ref": "#/definitions/client_id"},
                 "enabled": {"type": "boolean"},
-                "running": {"type": "boolean"}
+                "allowed_ips": {"$ref": "#/definitions/networks"}
             },
             "additionalProperties": false,
-            "required": ["id", "enabled", "running"]
+            "required": ["id", "enabled", "allowed_ips"]
         },
         "client_set": {
             "type": "object",
@@ -52,10 +52,11 @@
         "client_add": {
             "type": "object",
             "properties": {
-                "id": {"$ref": "#/definitions/client_id"}
+                "id": {"$ref": "#/definitions/client_id"},
+                "allowed_ips": {"$ref": "#/definitions/networks"}
             },
             "additionalProperties": false,
-            "required": ["id"]
+            "required": ["id", "allowed_ips"]
         },
         "client_export": {
             "type": "object",
@@ -65,15 +66,9 @@
                     "properties": {
                         "id": {"$ref": "#/definitions/client_id"},
                         "private-key": {"type": "string"},
-                        "addresses": {
-                            "type": "array",
-                            "items": {
-                                "oneOf": [
-                                    { "format": "ipv6prefix", "type": "string" },
-                                    { "format": "ipv4prefix", "type": "string" }
-                                ]
-                            }
-                        }
+                        "addresses": {"$ref": "#/definitions/networks"},
+                        "TODO-controller-id": {"type": "string"},
+                        "TODO-ip-addresses-within-vpn-network": {"type": "string"}
                     },
                     "additionalProperties": false,
                     "required": ["id", "private-key", "addresses"]
@@ -91,15 +86,7 @@
                             ]
                         },
                         "port": {"type": "integer", "minimum": 1, "maximum": 65535},
-                        "networks": {
-                            "type": "array",
-                            "items": {
-                                "oneOf": [
-                                    { "format": "ipv6prefix", "type": "string" },
-                                    { "format": "ipv4prefix", "type": "string" }
-                                ]
-                            }
-                        },
+                        "networks": {"$ref": "#/definitions/networks"},
                         "dns": {
                             "type": "array",
                             "items": {
@@ -358,7 +345,7 @@
                 "module": {"enum": ["wireguard"]},
                 "kind": {"enum": ["notification"]},
                 "action": {"enum": ["client_add"]},
-                "data": {"$ref": "#/definitions/client_get"}
+                "data": {"$ref": "#/definitions/client_add"}
             },
             "additionalProperties": false,
             "required": ["data"]

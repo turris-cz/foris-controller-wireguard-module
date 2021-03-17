@@ -47,15 +47,11 @@ class WireguardModule(BaseModule):
         return {"result": res}
 
     def action_client_add(self, data):
-        def notify(msg):
-            self.notify("client_add", msg)
+        res = self.handler.client_add(**data)
+        if res:
+            self.notify("client_add", data)
 
-        # notify and exit notify are the same
-        async_id = self.handler.client_add(
-            data["name"], notify, notify, self.reset_notify
-        )
-
-        return {"task_id": async_id}
+        return {"result": res}
 
     def action_client_del(self, data):
         res = self.handler.client_del(data["id"])

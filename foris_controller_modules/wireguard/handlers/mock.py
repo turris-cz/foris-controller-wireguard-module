@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 class MockWireguardHandler(Handler, BaseMockHandler):
-    clients: typing.List[dict] = []
+    clients: typing.Dict[str, dict] = []
     remotes: typing.List[dict] = []
     ready = False
     server = {
@@ -75,12 +75,28 @@ class MockWireguardHandler(Handler, BaseMockHandler):
         )
 
     @logger_wrapper(logger)
-    def client_add(self, *args, **kwargs):
-        raise NotImplementedError()
+    def client_add(self, id, allowed_ips):
+        if id in [e["id"] for e in self.clients]:
+            return False
+
+        self.clients.append(
+            {
+                "id": id,
+                "enabled": True,
+                "allowed_ips": allowed_ips,
+            }
+        )
+
+        return True
 
     @logger_wrapper(logger)
-    def client_del(self, *args, **kwargs):
-        raise NotImplementedError()
+    def client_del(self, id):
+        if id not in [e["id"] for e in self.clients]:
+            return False
+
+        self.clients = [e for e in self.clients if e["id"] != id]
+
+        return True
 
     @logger_wrapper(logger)
     def client_set(self, *args, **kwargs):

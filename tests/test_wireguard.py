@@ -176,3 +176,96 @@ def test_update_settings(infrastructure, network_restart_command):
             "networks": ["10.33.33.1/24", "fc00::1234/48"],
         },
     }
+
+
+def test_client(infrastructure, network_restart_command):
+    # to use get_settings we need to generate server keys
+    infrastructure.process_message(
+        {"module": "wireguard", "action": "server_generate_keys", "kind": "request"}
+    )
+
+    filters = [
+        ("wireguard", "client_add"),
+        ("wireguard", "client_del"),
+    ]
+
+    # create clients
+    notifications = infrastructure.get_notifications(filters=filters)
+    res = infrastructure.process_message(
+        {
+            "module": "wireguard",
+            "action": "client_add",
+            "kind": "request",
+            "data": {
+                "id": "test_client1",
+                "allowed_ips": ["192.168.33.0/24", "fc00::5678/48"],
+            },
+        }
+    )
+
+    assert res["data"]["result"] is True
+    notifications = infrastructure.get_notifications(notifications, filters=filters)
+    assert notifications[-1] == {
+        "module": "wireguard",
+        "action": "client_add",
+        "kind": "notification",
+        "data": {
+            "id": "test_client1",
+            "allowed_ips": ["192.168.33.0/24", "fc00::5678/48"],
+        },
+    }
+
+    res = infrastructure.process_message(
+        {
+            "module": "wireguard",
+            "action": "client_add",
+            "kind": "request",
+            "data": {
+                "id": "test_client1",
+                "allowed_ips": ["192.168.33.0/24", "fc00::5678/48"],
+            },
+        }
+    )
+    assert res["data"]["result"] is False, "Already exists"
+
+    # list client
+    res = infrastructure.process_message(
+        {"module": "wireguard", "action": "get_settings", "kind": "request"}
+    )
+    assert "test_client1" in [e["id"] for e in res["data"]["clients"]]
+
+    # delete client
+    res = infrastructure.process_message(
+        {
+            "module": "wireguard",
+            "action": "client_del",
+            "kind": "request",
+            "data": {"id": "test_client1"},
+        }
+    )
+    assert res["data"]["result"] is True
+    notifications = infrastructure.get_notifications(notifications, filters=filters)
+    assert notifications[-1] == {
+        "module": "wireguard",
+        "action": "client_del",
+        "kind": "notification",
+        "data": {
+            "id": "test_client1",
+        },
+    }
+
+    # list client
+    res = infrastructure.process_message(
+        {"module": "wireguard", "action": "get_settings", "kind": "request"}
+    )
+    assert "test_client1" not in [e["id"] for e in res["data"]["clients"]]
+
+    res = infrastructure.process_message(
+        {
+            "module": "wireguard",
+            "action": "client_del",
+            "kind": "request",
+            "data": {"id": "test_client1"},
+        }
+    )
+    assert res["data"]["result"] is False, "Already deleted"
