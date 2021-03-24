@@ -18,6 +18,7 @@
 #
 
 import ipaddress
+import itertools
 import json
 import logging
 import os
@@ -59,13 +60,29 @@ def get_zone_name():
 
 
 class WireguardCmds(BaseCmdLine):
+    def generate_client_keys(self, client_id):
+        self._generate_keys(
+            WireguardFile.client_key(client_id),
+            WireguardFile.client_pub(client_id),
+            WireguardFile.client_psk(client_id),
+        )
+
     def generate_server_keys(self):
+        self._generate_keys(
+            WireguardFile.server_key(),
+            WireguardFile.server_pub(),
+            WireguardFile.server_psk(),
+        )
+
+    def _generate_keys(
+        self, key_path: pathlib.Path, pub_path: pathlib.Path, psk_path: pathlib.Path
+    ):
         WireguardFile.makedirs()
         self._run_command_and_check_retval(
             [
                 "/bin/sh",
                 "-c",
-                f'wg genkey | tee "{inject_file_root(str(WireguardFile.server_key()))}" | wg pubkey > "{inject_file_root(str(WireguardFile.server_pub()))}"',
+                f'wg genkey | tee "{inject_file_root(str(key_path))}" | wg pubkey > "{inject_file_root(str(pub_path))}"',
             ],
             0,
         )
@@ -73,7 +90,7 @@ class WireguardCmds(BaseCmdLine):
             [
                 "/bin/sh",
                 "-c",
-                f'wg genpsk > "{inject_file_root(str(WireguardFile.server_psk()))}"',
+                f'wg genpsk > "{inject_file_root(str(psk_path))}"',
             ],
             0,
         )
@@ -140,12 +157,41 @@ class WireguardFile(BaseFile):
     def server_psk_content() -> str:
         return BaseFile()._file_content(str(WireguardFile.server_psk()))
 
+    @staticmethod
+    def client_key(client_id: str) -> pathlib.Path:
+        return WireguardFile.CLIENTS_DIR / f"{client_id}.key"
+
+    @staticmethod
+    def client_pub(client_id: str) -> pathlib.Path:
+        return WireguardFile.CLIENTS_DIR / f"{client_id}.pub"
+
+    @staticmethod
+    def client_psk(client_id: str) -> pathlib.Path:
+        return WireguardFile.CLIENTS_DIR / f"{client_id}.psk"
+
+    @staticmethod
+    def client_key_content(client_id: str) -> str:
+        return BaseFile()._file_content(str(WireguardFile.client_key(client_id)))
+
+    @staticmethod
+    def client_pub_content(client_id: str) -> str:
+        return BaseFile()._file_content(str(WireguardFile.client_pub(client_id)))
+
+    @staticmethod
+    def client_psk_content(client_id: str) -> str:
+        return BaseFile()._file_content(str(WireguardFile.client_psk(client_id)))
+
     def server_delete_keys(self):
-        """ removes all keys """
+        """ removes all server keys """
         self.delete_file(str(WireguardFile.server_key()))
         self.delete_file(str(WireguardFile.server_pub()))
         self.delete_file(str(WireguardFile.server_psk()))
-        self.delete_directory(str(WireguardFile.CLIENTS_DIR))
+
+    def delete_client_keys(self, client_id: str):
+        """ remove keys of a client """
+        self.delete_file(str(WireguardFile.client_key(client_id)))
+        self.delete_file(str(WireguardFile.client_pub(client_id)))
+        self.delete_file(str(WireguardFile.client_psk(client_id)))
 
 
 class WireguardUci:
@@ -189,6 +235,9 @@ class WireguardUci:
         return result
 
     def server_update_settings(self, enabled, networks=None, port=None) -> bool:
+        # TODO need to decide what to do when IP address range in wg network changes
+        # how to reflect this configuration in peer section + clients would use different addresses
+        # perhaps if there are clients addresses in LAN network should be readonly should be read only
         if not WireguardFile.keys_ready():
             return False
 
@@ -259,18 +308,117 @@ class WireguardUci:
         # add private key obtained from the server
         pass
 
-    def add_wireguard_client(self):
-        # TODO
-        interface = get_interface_name()
-        cli_interface = f"client_{interface}"
-
-        # configure wireguard
-        backend.add_section("network", f"wireguard_{interface}", cli_interface)
-        backend.set_option("network", cli_interface, "public_key", store_bool(enabled))
-        backend.set_option(
-            "network", cli_interface, "preshared_key", store_bool(enabled)
+    @staticmethod
+    def _get_wg_network_client_ips(
+        data, cli_name: str, section: str
+    ) -> typing.List[str]:
+        client_networks = get_option_named(data, "network", cli_name, "allowed_ips", [])
+        client_networks = [
+            ipaddress.ip_interface(e, strict=False) for e in client_networks
+        ]
+        network_addresses = get_option_named(
+            data,
+            "network",
+            get_interface_name(),
+            "addresses",
         )
-        backend.replace_list("network", cli_interface, "allowed_ips", networks)
+        network_addresses = [
+            ipaddress.ip_interface(e, strict=False) for e in network_addresses
+        ]
+        existing_ips = itertools.chain(
+            *[
+                e["data"].get("allowed_ips", [])
+                for e in get_sections_by_type(data, "network", section)
+            ]
+        )
+        existing_ips = [ipaddress.ip_interface(e).ipaddress for e in existing_ips]
+
+        res = []
+        # test whether client has an IP assigned within wg network
+        for network in network_addresses:
+            # already present
+            present = False
+            for e in client_networks:
+                if e.ip in network:
+                    res.append(str(e))
+                    present = True
+                    break
+
+            if present:
+                continue
+
+            # derive new ip > itetrate through unusend
+            for ip in network:
+                if ip not in existing_ips:
+                    res.append(f"{ip}/{network.prefixlen}")
+                    break
+
+        return res
+
+    def add_client(self, id, allowed_ips):
+        if not WireguardFile.keys_ready():
+            return False
+
+        with UciBackend() as backend:
+
+            interface = get_interface_name()
+            cli_name = f"wgclient_{id}"
+            section = f"wireguard_{interface}"
+
+            # Check whether it exists
+            data = backend.read("network")
+            existing_ids = [
+                e["name"] for e in get_sections_by_type(data, "network", "openvpn")
+            ]
+            if id in existing_ids:
+                return False
+
+            try:
+                # wireguard interface is not created
+                # don't create the client unless it is created
+                get_option_named(
+                    data,
+                    "network",
+                    get_interface_name(),
+                    "addresses",
+                )
+            except UciRecordNotFound:
+                # wireguard interface doesn't exist
+                return False
+
+            # make sure that the section exists
+            backend.add_section("network", section, cli_name)
+
+            # Get client ip in wireguard network
+            inner_ips = self._get_wg_network_client_ips(data, cli_name, section)
+            #  merge allowed_ips with ip of the client within WG network
+            allowed_ips = inner_ips + allowed_ips
+
+            # Generate keys
+            WireguardCmds().generate_client_keys(id)
+
+            # Configure client
+            backend.add_section("network", section, cli_name)
+            backend.set_option(
+                "network",
+                interface,
+                "public_key",
+                WireguardFile.client_pub_content(id).strip(),
+            )
+            backend.set_option(
+                "network",
+                interface,
+                "preshared_key",
+                WireguardFile.client_psk_content(id).strip(),
+            )
+            backend.replace_list("network", cli_name, "allowed_ips", allowed_ips)
+            # TODO this migh be and optional (you may not want to route trafic to the client network)
+            backend.set_option(
+                "network", cli_name, "route_allowed_ips", store_bool(True)
+            )
+
+        MaintainCommands().restart_network()
+        return True
 
     def server_update_settings_old():
         if enabled:

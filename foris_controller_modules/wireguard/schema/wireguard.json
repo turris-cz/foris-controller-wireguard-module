@@ -1,6 +1,6 @@
 {
     "definitions": {
-        "client_id": {"type": "string", "pattern": "^[a-zA-Z0-9_]{1,50}$"},
+        "client_id": {"type": "string", "pattern": "^[a-zA-Z0-9_]{1,20}$"},
         "networks": {
             "type": "array",
             "items": {
