@@ -43,6 +43,7 @@ from foris_controller_backends.uci import (
     get_option_named,
     get_sections_by_type,
     parse_bool,
+    section_exists,
     store_bool,
 )
 from foris_controller_backends.wan import WanStatusCommands
@@ -51,12 +52,15 @@ logger = logging.getLogger(__name__)
 
 
 def get_interface_name():
-    # return "wg_turris"
     return f"wg_{app_info['controller_id']}"
 
 
 def get_zone_name():
     return get_interface_name()
+
+
+def get_wg_client_type():
+    return f"wireguard_{get_interface_name()}"
 
 
 class WireguardCmds(BaseCmdLine):
@@ -229,6 +233,15 @@ class WireguardUci:
                 get_option_named(data, "network", interface, "listen_port")
             )
 
+            # read clients
+            for client_section in get_sections_by_type(data, "network", get_wg_client_type()):
+                client = {
+                    "id": client_section["name"][len("wg_client_") - 1:],
+                    "allowed_ips": client_section["data"].get("allowed_ips", []),
+                    "enabled": parse_bool(client_section["data"].get("enabled", "0")),
+                }
+                result["clients"].append(client)
+
         except (UciException, UciRecordNotFound):
             result["server"] = WireguardUci.DEFAULTS
 
@@ -314,7 +327,7 @@ class WireguardUci:
     ) -> typing.List[str]:
         client_networks = get_option_named(data, "network", cli_name, "allowed_ips", [])
         client_networks = [
-            ipaddress.ip_interface(e, strict=False) for e in client_networks
+            ipaddress.ip_interface(e) for e in client_networks
         ]
         network_addresses = get_option_named(
             data,
@@ -323,7 +336,7 @@ class WireguardUci:
             "addresses",
         )
         network_addresses = [
-            ipaddress.ip_interface(e, strict=False) for e in network_addresses
+            ipaddress.ip_interface(e) for e in network_addresses
         ]
         existing_ips = itertools.chain(
             *[
@@ -331,7 +344,7 @@ class WireguardUci:
                 for e in get_sections_by_type(data, "network", section)
             ]
         )
-        existing_ips = [ipaddress.ip_interface(e).ipaddress for e in existing_ips]
+        existing_ips = [ipaddress.ip_interface(e).ip for e in existing_ips]
 
         res = []
         # test whether client has an IP assigned within wg network
@@ -339,7 +352,7 @@ class WireguardUci:
             # already present
             present = False
             for e in client_networks:
-                if e.ip in network:
+                if e.ip in network.network:
                     res.append(str(e))
                     present = True
                     break
@@ -348,9 +361,9 @@ class WireguardUci:
                 continue
 
             # derive new ip > itetrate through unusend
-            for ip in network:
+            for ip in itertools.islice(network.network, 1, None):  # skip first ip (192.168.1.0)
                 if ip not in existing_ips:
-                    res.append(f"{ip}/{network.prefixlen}")
+                    res.append(f"{ip}/{network.network.prefixlen}")
                     break
 
         return res
@@ -363,12 +376,12 @@ class WireguardUci:
 
             interface = get_interface_name()
             cli_name = f"wgclient_{id}"
-            section = f"wireguard_{interface}"
+            section = get_wg_client_type()
 
             # Check whether it exists
             data = backend.read("network")
             existing_ids = [
-                e["name"] for e in get_sections_by_type(data, "network", "openvpn")
+                e["name"] for e in get_sections_by_type(data, "network", section)
             ]
             if id in existing_ids:
                 return False
@@ -386,7 +399,11 @@ class WireguardUci:
                 # wireguard interface doesn't exist
                 return False
 
-            # make sure that the section exists
+            # Client with given name already exists
+            if section_exists(data, "network", cli_name):
+                return False
+
+            # create the section
             backend.add_section("network", section, cli_name)
 
             # Get client ip in wireguard network
@@ -416,9 +433,27 @@ class WireguardUci:
             backend.set_option(
                 "network", cli_name, "route_allowed_ips", store_bool(True)
             )
+            backend.set_option("network", cli_name, "enabled", store_bool(True))
 
         MaintainCommands().restart_network()
         return True
+
+    def del_client(self, id):
+        with UciBackend() as backend:
+
+            cli_name = f"wgclient_{id}"
+
+            data = backend.read("network")
+            # Client with given name already exists
+            if not section_exists(data, "network", cli_name):
+                return False
+
+            # create the section
+            backend.del_section("network", cli_name)
+
+        MaintainCommands().restart_network()
+        return True
+
 
     def server_update_settings_old():
         if enabled:

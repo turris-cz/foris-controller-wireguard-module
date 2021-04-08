@@ -184,6 +184,20 @@ def test_client(infrastructure, network_restart_command):
         {"module": "wireguard", "action": "server_generate_keys", "kind": "request"}
     )
 
+    # and make sure that the server is configured (if uci is empty ip detection fails)
+    infrastructure.process_message(
+        {
+            "module": "wireguard",
+            "action": "server_update_settings",
+            "kind": "request",
+            "data": {
+                "enabled": True,
+                "port": 11111,
+                "networks": ["10.33.33.1/24", "fc00::1234/48"],
+            },
+        }
+    )
+
     filters = [
         ("wireguard", "client_add"),
         ("wireguard", "client_del"),

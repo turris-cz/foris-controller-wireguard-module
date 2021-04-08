@@ -68,8 +68,8 @@ class OpenwrtWireguardHandler(Handler, BaseOpenwrtHandler):
         return self.uci.add_client(id, allowed_ips)
 
     @logger_wrapper(logger)
-    def client_del(self, *args, **kwargs):
-        raise NotImplementedError()
+    def client_del(self, id):
+        return self.uci.del_client(id)
 
     @logger_wrapper(logger)
     def client_set(self, *args, **kwargs):
