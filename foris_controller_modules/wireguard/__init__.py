@@ -66,7 +66,7 @@ class WireguardModule(BaseModule):
         return {"result": res}
 
     def action_client_export(self, data):
-        return self.handler.get_client_export(**data)
+        return self.handler.client_export(**data)
 
     def action_remote_import(self, data):
         res = self.handler.remote_import(**data)

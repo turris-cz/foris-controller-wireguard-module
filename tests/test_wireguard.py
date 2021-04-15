@@ -201,6 +201,7 @@ def test_client(infrastructure, network_restart_command):
     filters = [
         ("wireguard", "client_add"),
         ("wireguard", "client_del"),
+        ("wireguard", "client_set"),
     ]
 
     # create clients
@@ -247,6 +248,42 @@ def test_client(infrastructure, network_restart_command):
         {"module": "wireguard", "action": "get_settings", "kind": "request"}
     )
     assert "test_client1" in [e["id"] for e in res["data"]["clients"]]
+
+    # disable client
+    res = infrastructure.process_message(
+        {
+            "module": "wireguard",
+            "action": "client_set",
+            "kind": "request",
+            "data": {
+                "id": "test_client1",
+                "enabled": False,
+            },
+        }
+    )
+    assert res["data"]["result"] is True
+    notifications = infrastructure.get_notifications(notifications, filters=filters)
+    assert notifications[-1] == {
+        "module": "wireguard",
+        "action": "client_set",
+        "kind": "notification",
+        "data": {
+            "id": "test_client1",
+            "enabled": False,
+        },
+    }
+
+    # test client export
+    res = infrastructure.process_message(
+        {
+            "module": "wireguard",
+            "action": "client_export",
+            "kind": "request",
+            "data": {"id": "test_client1"},
+        }
+    )
+    assert "server" in res["data"]
+    assert "client" in res["data"]
 
     # delete client
     res = infrastructure.process_message(

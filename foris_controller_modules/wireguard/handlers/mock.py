@@ -99,12 +99,37 @@ class MockWireguardHandler(Handler, BaseMockHandler):
         return True
 
     @logger_wrapper(logger)
-    def client_set(self, *args, **kwargs):
-        raise NotImplementedError()
+    def client_set(self, id, enabled):
+        for client in self.clients:
+            if client["id"] == id:
+                client["enabled"] = enabled
+                return True
+
+        return False
 
     @logger_wrapper(logger)
-    def client_export(self, *args, **kwargs):
-        raise NotImplementedError()
+    def client_export(self, id):
+        for client in self.clients:
+            if client["id"] == id:
+                return {
+                    "result": True,
+                    "server": {
+                        "serial-number": "0011223344556677",
+                        "preshared-key": "<preshared>",
+                        "public-key": "<public>",
+                        "address": "1.2.3.4",  # wan address
+                        "port": self.server["port"],
+                        "networks": self.server["networks"] + ["192.168.24.1/24"],
+                        "dns": [],
+                    },
+                    "client": {
+                        "id": id,
+                        "private-key": "<private>",
+                        "addresses": client["allowed_ips"],
+                    },
+                }
+
+        return {"result": False}
 
     @logger_wrapper(logger)
     def remote_import(self, *args, **kwargs):

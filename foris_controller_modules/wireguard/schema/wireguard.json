@@ -61,14 +61,13 @@
         "client_export": {
             "type": "object",
             "properties": {
+                "result": {"type": "boolean"},
                 "client": {
                     "type": "object",
                     "properties": {
                         "id": {"$ref": "#/definitions/client_id"},
                         "private-key": {"type": "string"},
-                        "addresses": {"$ref": "#/definitions/networks"},
-                        "TODO-controller-id": {"type": "string"},
-                        "TODO-ip-addresses-within-vpn-network": {"type": "string"}
+                        "addresses": {"$ref": "#/definitions/networks", "description": "addresses within wg network"}
                     },
                     "additionalProperties": false,
                     "required": ["id", "private-key", "addresses"]
@@ -86,7 +85,7 @@
                             ]
                         },
                         "port": {"type": "integer", "minimum": 1, "maximum": 65535},
-                        "networks": {"$ref": "#/definitions/networks"},
+                        "networks": {"$ref": "#/definitions/networks", "description": "client should add routes for this address"},
                         "dns": {
                             "type": "array",
                             "items": {
@@ -102,7 +101,7 @@
                 }
             },
             "additionalProperties": false,
-            "required": ["server", "client"]
+            "required": ["server", "client", "result"]
         },
         "client_export_imported": {
             "type": "object",
