@@ -1,0 +1,79 @@
+#!/bin/sh
+
+if [ "$1" = "lan" ] ; then
+	IPv4="10.20.30.40"
+else
+	IPv4="172.20.6.87"
+fi
+
+cat << EOF
+{
+	"up": true,
+	"pending": false,
+	"available": true,
+	"autostart": true,
+	"dynamic": false,
+	"uptime": 14151,
+	"l3_device": "eth2",
+	"proto": "dhcp",
+	"device": "eth2",
+	"updated": [
+		"addresses",
+		"routes",
+		"data"
+	],
+	"metric": 0,
+	"dns_metric": 0,
+	"delegation": true,
+	"ipv4-address": [
+		{
+			"address": "${IPv4}",
+			"mask": 24
+		}
+	],
+	"ipv6-address": [
+		
+	],
+	"ipv6-prefix": [
+		
+	],
+	"ipv6-prefix-assignment": [
+		
+	],
+	"route": [
+		{
+			"target": "0.0.0.0",
+			"mask": 0,
+			"nexthop": "172.20.6.250",
+			"source": "172.20.6.87\/32"
+		}
+	],
+	"dns-server": [
+		"172.20.20.53",
+		"172.20.20.56"
+	],
+	"dns-search": [
+		
+	],
+	"inactive": {
+		"ipv4-address": [
+			
+		],
+		"ipv6-address": [
+			
+		],
+		"route": [
+			
+		],
+		"dns-server": [
+			
+		],
+		"dns-search": [
+			
+		]
+	},
+	"data": {
+		"leasetime": 28685
+	}
+}
+EOF

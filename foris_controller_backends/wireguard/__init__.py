@@ -27,6 +27,7 @@ import re
 import typing
 
 from foris_controller.app import app_info
+from foris_controller_backends.about import CryptoWrapperCmds
 from foris_controller_backends.cmdline import BaseCmdLine
 from foris_controller_backends.files import (
     BaseFile,
@@ -34,6 +35,7 @@ from foris_controller_backends.files import (
     makedirs,
     path_exists,
 )
+from foris_controller_backends.lan import LanUci
 from foris_controller_backends.maintain import MaintainCommands
 from foris_controller_backends.services import OpenwrtServices
 from foris_controller_backends.uci import (
@@ -234,9 +236,11 @@ class WireguardUci:
             )
 
             # read clients
-            for client_section in get_sections_by_type(data, "network", get_wg_client_type()):
+            for client_section in get_sections_by_type(
+                data, "network", get_wg_client_type()
+            ):
                 client = {
-                    "id": client_section["name"][len("wg_client_") - 1:],
+                    "id": client_section["name"][len("wg_client_") - 1 :],
                     "allowed_ips": client_section["data"].get("allowed_ips", []),
                     "enabled": parse_bool(client_section["data"].get("enabled", "0")),
                 }
@@ -322,22 +326,27 @@ class WireguardUci:
         pass
 
     @staticmethod
+    def _get_lan_addresses(network_config) -> ipaddress.IPv4Interface:
+        address, netmask, *_ = LanUci._get_network_combo(network_config)
+        return ipaddress.ip_interface(f"{address}/{netmask}")
+
+    @staticmethod
+    def _get_wan_address():
+        return WanStatusCommands().get_status()["ipv4"][0]
+
+    @staticmethod
     def _get_wg_network_client_ips(
         data, cli_name: str, section: str
     ) -> typing.List[str]:
         client_networks = get_option_named(data, "network", cli_name, "allowed_ips", [])
-        client_networks = [
-            ipaddress.ip_interface(e) for e in client_networks
-        ]
+        client_networks = [ipaddress.ip_interface(e) for e in client_networks]
         network_addresses = get_option_named(
             data,
             "network",
             get_interface_name(),
             "addresses",
         )
-        network_addresses = [
-            ipaddress.ip_interface(e) for e in network_addresses
-        ]
+        network_addresses = [ipaddress.ip_interface(e) for e in network_addresses]
         existing_ips = itertools.chain(
             *[
                 e["data"].get("allowed_ips", [])
@@ -361,7 +370,9 @@ class WireguardUci:
                 continue
 
             # derive new ip > itetrate through unusend
-            for ip in itertools.islice(network.network, 1, None):  # skip first ip (192.168.1.0)
+            for ip in itertools.islice(
+                network.network, 1, None
+            ):  # skip first ip (192.168.1.0)
                 if ip not in existing_ips:
                     res.append(f"{ip}/{network.network.prefixlen}")
                     break
@@ -438,6 +449,57 @@ class WireguardUci:
         MaintainCommands().restart_network()
         return True
 
+    def export_client(self, id: str) -> typing.Optional[typing.Dict[str, typing.Any]]:
+        cli_name = f"wgclient_{id}"
+
+        with UciBackend() as backend:
+            uci_data = backend.read("network")
+            if not section_exists(uci_data, "network", cli_name):
+                return None
+
+        interface = get_interface_name()
+
+        res = {
+            "client": {
+                "id": id,
+                "private-key": WireguardFile.client_key_content(id).strip(),
+                "addresses": get_option_named(
+                    uci_data, "network", cli_name, "allowed_ips"
+                ),  # server expect these address on the client
+            },
+            "server": {
+                "serial-number": CryptoWrapperCmds().get_serial(),
+                "address": self._get_wan_address(),
+                "public-key": WireguardFile.server_pub_content(),
+                "preshared-key": WireguardFile.server_psk_content(),
+                "port": int(
+                    get_option_named(uci_data, "network", interface, "listen_port")
+                ),
+                "networks": [str(self._get_lan_addresses(uci_data))]
+                + get_option_named(
+                    uci_data, "network", get_interface_name(), "addresses"
+                ),  # lan addresses + wg addresses
+                "dns": [],  # just keep empty for now
+            },
+        }
+        return res
+
+    def set_client(self, id: str, enabled: bool):
+        with UciBackend() as backend:
+
+            cli_name = f"wgclient_{id}"
+
+            data = backend.read("network")
+            # Client with given name already exists
+            if not section_exists(data, "network", cli_name):
+                return False
+
+            # create the section
+            backend.set_option("network", cli_name, "enabled", store_bool(enabled))
+
+        MaintainCommands().restart_network()
+        return True
+
     def del_client(self, id):
         with UciBackend() as backend:
 
@@ -453,7 +515,6 @@ class WireguardUci:
 
         MaintainCommands().restart_network()
         return True
-
 
     def server_update_settings_old():
         if enabled:

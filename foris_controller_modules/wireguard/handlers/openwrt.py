@@ -72,12 +72,17 @@ class OpenwrtWireguardHandler(Handler, BaseOpenwrtHandler):
         return self.uci.del_client(id)
 
     @logger_wrapper(logger)
-    def client_set(self, *args, **kwargs):
-        raise NotImplementedError()
+    def client_set(self, id, enabled):
+        return self.uci.set_client(id, enabled)
 
     @logger_wrapper(logger)
-    def client_export(self, *args, **kwargs):
-        raise NotImplementedError()
+    def client_export(self, id):
+        output = self.uci.export_client(id)
+        if output:
+            output["result"] = True
+            return output
+        else:
+            return {"result": False}
 
     @logger_wrapper(logger)
     def remote_import(self, *args, **kwargs):
