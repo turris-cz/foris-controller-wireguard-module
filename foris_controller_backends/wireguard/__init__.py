@@ -188,13 +188,13 @@ class WireguardFile(BaseFile):
         return BaseFile()._file_content(str(WireguardFile.client_psk(client_id)))
 
     def server_delete_keys(self):
-        """ removes all server keys """
+        """removes all server keys"""
         self.delete_file(str(WireguardFile.server_key()))
         self.delete_file(str(WireguardFile.server_pub()))
         self.delete_file(str(WireguardFile.server_psk()))
 
     def delete_client_keys(self, client_id: str):
-        """ remove keys of a client """
+        """remove keys of a client"""
         self.delete_file(str(WireguardFile.client_key(client_id)))
         self.delete_file(str(WireguardFile.client_pub(client_id)))
         self.delete_file(str(WireguardFile.client_psk(client_id)))
@@ -222,8 +222,8 @@ class WireguardUci:
 
         try:
             interface = get_interface_name()
-            result["server"]["enabled"] = parse_bool(
-                get_option_named(data, "network", interface, "enabled", "0")
+            result["server"]["enabled"] = not parse_bool(
+                get_option_named(data, "network", interface, "disabled", "0")
             )
             result["server"]["networks"] = get_option_named(
                 data,
@@ -242,7 +242,9 @@ class WireguardUci:
                 client = {
                     "id": client_section["name"][len("wg_client_") - 1 :],
                     "allowed_ips": client_section["data"].get("allowed_ips", []),
-                    "enabled": parse_bool(client_section["data"].get("enabled", "0")),
+                    "enabled": not parse_bool(
+                        client_section["data"].get("disabled", "0")
+                    ),
                 }
                 result["clients"].append(client)
 
@@ -268,7 +270,9 @@ class WireguardUci:
 
             # configure interface
             backend.add_section("network", "interface", interface)
-            backend.set_option("network", interface, "enabled", store_bool(enabled))
+            backend.set_option(
+                "network", interface, "disabled", store_bool(not enabled)
+            )
             backend.set_option("network", interface, "proto", "wireguard")
             backend.set_option(
                 "network",
@@ -444,7 +448,7 @@ class WireguardUci:
             backend.set_option(
                 "network", cli_name, "route_allowed_ips", store_bool(True)
             )
-            backend.set_option("network", cli_name, "enabled", store_bool(True))
+            backend.set_option("network", cli_name, "disabled", store_bool(False))
 
         MaintainCommands().restart_network()
         return True
@@ -495,7 +499,7 @@ class WireguardUci:
                 return False
 
             # create the section
-            backend.set_option("network", cli_name, "enabled", store_bool(enabled))
+            backend.set_option("network", cli_name, "disabled", store_bool(not enabled))
 
         MaintainCommands().restart_network()
         return True
