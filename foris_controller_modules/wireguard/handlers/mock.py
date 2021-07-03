@@ -35,6 +35,7 @@ class MockWireguardHandler(Handler, BaseMockHandler):
     server = {
         "enabled": False,
         "port": 51820,
+        "host": "1.2.3.4",
         "networks": ["10.211.211.0/24"],
     }
 
@@ -114,17 +115,18 @@ class MockWireguardHandler(Handler, BaseMockHandler):
                 return {
                     "result": True,
                     "server": {
-                        "serial-number": "0011223344556677",
-                        "preshared-key": "<preshared>",
-                        "public-key": "<public>",
+                        "serial_number": "0011223344556677",
+                        "preshared_key": "<preshared>",
+                        "public_key": "<public>",
                         "address": "1.2.3.4",  # wan address
                         "port": self.server["port"],
+                        "host": self.server["host"],
                         "networks": self.server["networks"] + ["192.168.24.1/24"],
                         "dns": [],
                     },
                     "client": {
                         "id": id,
-                        "private-key": "<private>",
+                        "private_key": "<private>",
                         "addresses": client["allowed_ips"],
                     },
                 }
@@ -132,12 +134,34 @@ class MockWireguardHandler(Handler, BaseMockHandler):
         return {"result": False}
 
     @logger_wrapper(logger)
-    def remote_import(self, *args, **kwargs):
-        raise NotImplementedError()
+    def remote_import(self, server, client):
+        if any(
+            e["server"]["serial_number"] == server["serial_number"]
+            for e in self.remotes
+        ):
+            return False
+
+        self.remotes.push(
+            {
+                "server": server,
+                "client": client,
+            }
+        )
+        return True
 
     @logger_wrapper(logger)
-    def remote_del(self, *args, **kwargs):
-        raise NotImplementedError()
+    def remote_del(self, id, serial_number):
+        new_remotes = [
+            e
+            for e in self.remotes
+            if e["id"] == id and e["serial_number"] == serial_number
+        ]
+        if len(new_remotes) == self.self.remotes:
+            return False
+
+        self.remotes = new_remotes
+
+        return True
 
     @logger_wrapper(logger)
     def remote_set(self, *args, **kwargs):

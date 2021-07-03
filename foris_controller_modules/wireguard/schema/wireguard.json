@@ -34,20 +34,24 @@
             "type": "object",
             "properties": {
                 "id": {"$ref": "#/definitions/client_id"},
+                "serial_number": {"type": "string"},
                 "enabled": {"type": "boolean"},
-                "running": {"type": "boolean"}
+                "allowed_ips": {"$ref": "#/definitions/networks"}
             },
             "additionalProperties": false,
-            "required": ["id", "enabled", "running"]
+            "required": ["id", "serial_number", "enabled", "allowed_ips"]
         },
         "remote_set": {
             "type": "object",
             "properties": {
                 "id": {"$ref": "#/definitions/client_id"},
-                "enabled": {"type": "boolean"}
+                "serial_number": {"type": "strig"},
+                "enabled": {"type": "boolean"},
+                "allowed_ips": {"$ref": "#/definitions/networks"},
+                "server_port": {"type": "integer", "minimum": 1, "maximum": 65535},
             },
             "additionalProperties": false,
-            "required": ["id", "enabled"]
+            "required": ["id", "serial_number', "enabled", "allowed_ips", ""]
         },
         "client_add": {
             "type": "object",
@@ -66,18 +70,18 @@
                     "type": "object",
                     "properties": {
                         "id": {"$ref": "#/definitions/client_id"},
-                        "private-key": {"type": "string"},
+                        "private_key": {"type": "string"},
                         "addresses": {"$ref": "#/definitions/networks", "description": "addresses within wg network"}
                     },
                     "additionalProperties": false,
-                    "required": ["id", "private-key", "addresses"]
+                    "required": ["id", "private_key", "addresses"]
                 },
                 "server": {
                     "type": "object",
                     "properties": {
-                        "serial-number": {"type": "string"},
-                        "preshared-key": {"type": "string"},
-                        "public-key": {"type": "string"},
+                        "serial_number": {"type": "string"},
+                        "preshared_key": {"type": "string"},
+                        "public_key": {"type": "string"},
                         "address": {
                             "oneOf": [
                                 { "format": "ipv4", "type": "string" },
@@ -85,6 +89,7 @@
                             ]
                         },
                         "port": {"type": "integer", "minimum": 1, "maximum": 65535},
+                        "host": {"type":"string"},
                         "networks": {"$ref": "#/definitions/networks", "description": "client should add routes for this address"},
                         "dns": {
                             "type": "array",
@@ -97,20 +102,13 @@
                         }
                     },
                     "additionalProperties": false,
-                    "required": ["serial-number", "preshared-key", "public-key", "address", "port", "networks", "dns"]
+                    "required": ["serial_number", "preshared_key", "public_key", "address", "port", "networks", "dns"]
                 }
             },
             "additionalProperties": false,
             "required": ["server", "client", "result"]
         },
         "client_export_imported": {
-            "type": "object",
-            "properties": {
-                "id": {"$ref": "#/definitions/client_id"},
-                "TODO": {"type": "boolean"}
-            },
-            "additionalProperties": false,
-            "required": ["id", "TODO"]
         },
         "server_update_settings": 
         {
@@ -492,7 +490,7 @@
             "required": ["data"]
         },
         {
-            "description": "Request to import data to connect to a remote server",
+            "description": " to import data to connect to a remote server",
             "properties": {
                 "module": {"enum": ["wireguard"]},
                 "kind": {"enum": ["reply"]},
@@ -510,7 +508,7 @@
             "required": ["data"]
         },
         {
-            "description": "Notification that client was of wireguard server was updated",
+            "description": "Notification that client was of wireguard server was imported",
             "properties": {
                 "module": {"enum": ["wireguard"]},
                 "kind": {"enum": ["notification"]},
@@ -519,10 +517,10 @@
                     "type": "object",
                     "properties": {
                         "id": {"$ref": "#/definitions/client_id"},
-                        "export": {"$ref": "#/definitions/client_export_imported"}
+                        "serial_number": {"type": "string"}
                     },
                     "additionalProperties": false,
-                    "required": ["id", "export"]
+                    "required": ["id", "serial_number"]
                 }
             },
             "additionalProperties": false,
@@ -537,10 +535,11 @@
                 "data": {
                     "type": "object",
                     "properties": {
-                        "id": {"$ref": "#/definitions/client_id"}
+                        "id": {"$ref": "#/definitions/client_id"},
+                        "serial_number": {"type": "string"}
                     },
                     "additionalProperties": false,
-                    "required": ["id"]
+                    "required": ["id", "serial_number"]
                 }
             },
             "additionalProperties": false,
@@ -573,10 +572,11 @@
                 "data": {
                     "type": "object",
                     "properties": {
-                        "id": {"$ref": "#/definitions/client_id"}
+                        "id": {"$ref": "#/definitions/client_id"},
+                        "serial_number": {"type": "string"}
                     },
                     "additionalProperties": false,
-                    "required": ["id"]
+                    "required": ["id", "serial_number"]
                 }
             },
             "additionalProperties": false,

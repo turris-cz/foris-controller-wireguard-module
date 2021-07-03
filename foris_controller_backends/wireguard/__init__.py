@@ -472,7 +472,7 @@ class WireguardUci:
                 ),  # server expect these address on the client
             },
             "server": {
-                "serial-number": CryptoWrapperCmds().get_serial(),
+                "serial_number": CryptoWrapperCmds().get_serial(),
                 "address": self._get_wan_address(),
                 "public-key": WireguardFile.server_pub_content(),
                 "preshared-key": WireguardFile.server_psk_content(),

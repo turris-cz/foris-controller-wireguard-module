@@ -71,7 +71,13 @@ class WireguardModule(BaseModule):
     def action_remote_import(self, data):
         res = self.handler.remote_import(**data)
         if res:
-            self.notify("remote_import", {"id": data["id"]})
+            self.notify(
+                "remote_import",
+                {
+                    "id": data["client"]["id"],
+                    "serial-number": data["server"]["serial-number"],
+                },
+            )
         return {"result": res}
 
     def action_remote_del(self, data):
