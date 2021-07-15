@@ -45,13 +45,18 @@
             "type": "object",
             "properties": {
                 "id": {"$ref": "#/definitions/client_id"},
-                "serial_number": {"type": "strig"},
                 "enabled": {"type": "boolean"},
-                "allowed_ips": {"$ref": "#/definitions/networks"},
+                "networks": {"$ref": "#/definitions/networks"},
                 "server_port": {"type": "integer", "minimum": 1, "maximum": 65535},
+                "server_address": {
+                    "oneOf": [
+                        { "format": "ipv4", "type": "string" },
+                        { "format": "ipv6", "type": "string" }
+                    ]
+                }
             },
             "additionalProperties": false,
-            "required": ["id", "serial_number', "enabled", "allowed_ips", ""]
+            "required": ["id", "enabled", "networks", "server_port", "server_address"]
         },
         "client_add": {
             "type": "object",
@@ -65,16 +70,14 @@
         "client_export": {
             "type": "object",
             "properties": {
-                "result": {"type": "boolean"},
                 "client": {
                     "type": "object",
                     "properties": {
-                        "id": {"$ref": "#/definitions/client_id"},
                         "private_key": {"type": "string"},
                         "addresses": {"$ref": "#/definitions/networks", "description": "addresses within wg network"}
                     },
                     "additionalProperties": false,
-                    "required": ["id", "private_key", "addresses"]
+                    "required": ["private_key", "addresses"]
                 },
                 "server": {
                     "type": "object",
@@ -106,9 +109,7 @@
                 }
             },
             "additionalProperties": false,
-            "required": ["server", "client", "result"]
-        },
-        "client_export_imported": {
+            "required": ["server", "client"]
         },
         "server_update_settings": 
         {
@@ -465,7 +466,28 @@
                 "module": {"enum": ["wireguard"]},
                 "kind": {"enum": ["reply"]},
                 "action": {"enum": ["client_export"]},
-                "data": {"$ref": "#/definitions/client_export"}
+                "data": {
+                    "oneOf": [
+                        {
+                            "type": "object",
+                            "properties": {
+                                "result": {"enum": [false]}
+                            },
+                            "additionalProperties": false,
+                            "required": ["result"]
+                        },
+                        {
+                            "type": "object",
+                            "properties": {
+                                "result": {"enum": [true]},
+                                "export": {"$ref": "#/definitions/client_export"}
+                            },
+                            "additionalProperties": false,
+                            "required": ["result", "export"]
+                        }
+                    ]
+
+                }
             },
             "additionalProperties": false,
             "required": ["data"]
@@ -480,10 +502,10 @@
                     "type": "object",
                     "properties": {
                         "id": {"$ref": "#/definitions/client_id"},
-                        "export": {"$ref": "#/definitions/client_export"}
+                        "import": {"$ref": "#/definitions/client_export"}
                     },
                     "additionalProperties": false,
-                    "required": ["id", "export"]
+                    "required": ["id", "import"]
                 }
             },
             "additionalProperties": false,
@@ -535,11 +557,10 @@
                 "data": {
                     "type": "object",
                     "properties": {
-                        "id": {"$ref": "#/definitions/client_id"},
-                        "serial_number": {"type": "string"}
+                        "id": {"$ref": "#/definitions/client_id"}
                     },
                     "additionalProperties": false,
-                    "required": ["id", "serial_number"]
+                    "required": ["id"]
                 }
             },
             "additionalProperties": false,
@@ -572,8 +593,7 @@
                 "data": {
                     "type": "object",
                     "properties": {
-                        "id": {"$ref": "#/definitions/client_id"},
-                        "serial_number": {"type": "string"}
+                        "id": {"$ref": "#/definitions/client_id"}
                     },
                     "additionalProperties": false,
                     "required": ["id", "serial_number"]

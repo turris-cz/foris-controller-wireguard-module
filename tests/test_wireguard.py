@@ -282,8 +282,20 @@ def test_client(infrastructure, network_restart_command):
             "data": {"id": "test_client1"},
         }
     )
-    assert "server" in res["data"]
-    assert "client" in res["data"]
+    assert res["data"]["result"] is True
+    assert "export" in res["data"]
+
+    # test client export non-existing
+    res = infrastructure.process_message(
+        {
+            "module": "wireguard",
+            "action": "client_export",
+            "kind": "request",
+            "data": {"id": "non_existing_client"},
+        }
+    )
+    assert res["data"]["result"] is False
+    assert "export" not in res["data"]
 
     # delete client
     res = infrastructure.process_message(
@@ -320,3 +332,100 @@ def test_client(infrastructure, network_restart_command):
         }
     )
     assert res["data"]["result"] is False, "Already deleted"
+
+
+def test_remote(infrastructure, network_restart_command):
+    filters = [
+        ("wireguard", "remote_import"),
+        ("wireguard", "remote_set"),
+        ("wireguard", "remote_del"),
+    ]
+
+    notifications = infrastructure.get_notifications(filters=filters)
+
+    client = {
+        "client": {
+            "private_key": "OKMJPdIVdE5HIpRwQj71xDxE1tRuMThAXn3QP+QciW0=",
+            "addresses": [
+                "10.33.33.1/24",
+                "fc00::1/48",
+                "192.168.33.0/24",
+                "fc00::5678/48",
+            ],
+        },
+        "server": {
+            "serial_number": "0000000000000011",
+            "address": "1.2.3.4",
+            "public_key": "Jlwf3Dg+gdSwv/FZOSSsUO+hENzhRwt+Rnk4L0DPQns=",
+            "preshared_key": "OoY5J19gmprmarIa0/Lyn7KaiDX8iHWAiVEUi+iUgoQ=",
+            "port": 11111,
+            "networks": ["192.168.1.1/24", "10.33.33.1/24", "fc00::1234/48"],
+            "dns": [],
+        },
+    }
+
+    # test import
+    res = infrastructure.process_message(
+        {
+            "module": "wireguard",
+            "action": "remote_import",
+            "kind": "request",
+            "data": {
+                "id": "remote1",
+                "import": client,
+            },
+        }
+    )
+    assert res["data"]["result"] is True
+    notifications = infrastructure.get_notifications(notifications, filters=filters)
+    assert notifications[-1]["action"] == "remote_import"
+    assert notifications[-1]["data"] == {
+        "id": "remote1",
+        "serial_number": "0000000000000011",
+    }
+    # TODO test get settings and check whether it is enabled
+
+    # test set
+    res = infrastructure.process_message(
+        {
+            "module": "wireguard",
+            "action": "remote_set",
+            "kind": "request",
+            "data": {
+                "id": "remote1",
+                "enabled": False,
+                "networks": ["192.168.1.1/24", "10.33.33.1/24"],
+                "server_address": "4.3.2.1",
+                "server_port": 22222,
+            },
+        }
+    )
+    assert res["data"]["result"] is True
+    notifications = infrastructure.get_notifications(notifications, filters=filters)
+    assert notifications[-1]["action"] == "remote_set"
+    assert notifications[-1]["data"] == {
+        "id": "remote1",
+        "enabled": False,
+        "networks": ["192.168.1.1/24", "10.33.33.1/24"],
+        "server_address": "4.3.2.1",
+        "server_port": 22222,
+    }
+    # TODO test get settings and check whether it is enabled
+
+    # test delete
+    res = infrastructure.process_message(
+        {
+            "module": "wireguard",
+            "action": "remote_del",
+            "kind": "request",
+            "data": {
+                "id": "remote1",
+            },
+        }
+    )
+    assert res["data"]["result"] is True
+    notifications = infrastructure.get_notifications(notifications, filters=filters)
+    assert notifications[-1]["action"] == "remote_del"
+    assert notifications[-1]["data"] == {
+        "id": "remote1",
+    }

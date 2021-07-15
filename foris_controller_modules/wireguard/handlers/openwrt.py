@@ -79,8 +79,7 @@ class OpenwrtWireguardHandler(Handler, BaseOpenwrtHandler):
     def client_export(self, id):
         output = self.uci.export_client(id)
         if output:
-            output["result"] = True
-            return output
+            return {"result": True, "export": output}
         else:
             return {"result": False}
 

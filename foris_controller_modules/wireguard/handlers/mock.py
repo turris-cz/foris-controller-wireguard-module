@@ -114,20 +114,21 @@ class MockWireguardHandler(Handler, BaseMockHandler):
             if client["id"] == id:
                 return {
                     "result": True,
-                    "server": {
-                        "serial_number": "0011223344556677",
-                        "preshared_key": "<preshared>",
-                        "public_key": "<public>",
-                        "address": "1.2.3.4",  # wan address
-                        "port": self.server["port"],
-                        "host": self.server["host"],
-                        "networks": self.server["networks"] + ["192.168.24.1/24"],
-                        "dns": [],
-                    },
-                    "client": {
-                        "id": id,
-                        "private_key": "<private>",
-                        "addresses": client["allowed_ips"],
+                    "export": {
+                        "server": {
+                            "serial_number": "0011223344556677",
+                            "preshared_key": "<preshared>",
+                            "public_key": "<public>",
+                            "address": "1.2.3.4",  # wan address
+                            "port": self.server["port"],
+                            "host": self.server["host"],
+                            "networks": self.server["networks"] + ["192.168.24.1/24"],
+                            "dns": [],
+                        },
+                        "client": {
+                            "private_key": "<private>",
+                            "addresses": client["allowed_ips"],
+                        },
                     },
                 }
 

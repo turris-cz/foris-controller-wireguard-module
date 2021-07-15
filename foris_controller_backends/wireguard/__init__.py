@@ -153,15 +153,15 @@ class WireguardFile(BaseFile):
 
     @staticmethod
     def server_key_content() -> str:
-        return BaseFile()._file_content(str(WireguardFile.server_key()))
+        return BaseFile()._file_content(str(WireguardFile.server_key())).strip()
 
     @staticmethod
     def server_pub_content() -> str:
-        return BaseFile()._file_content(str(WireguardFile.server_pub()))
+        return BaseFile()._file_content(str(WireguardFile.server_pub())).strip()
 
     @staticmethod
     def server_psk_content() -> str:
-        return BaseFile()._file_content(str(WireguardFile.server_psk()))
+        return BaseFile()._file_content(str(WireguardFile.server_psk())).strip()
 
     @staticmethod
     def client_key(client_id: str) -> pathlib.Path:
@@ -465,8 +465,7 @@ class WireguardUci:
 
         res = {
             "client": {
-                "id": id,
-                "private-key": WireguardFile.client_key_content(id).strip(),
+                "private_key": WireguardFile.client_key_content(id).strip(),
                 "addresses": get_option_named(
                     uci_data, "network", cli_name, "allowed_ips"
                 ),  # server expect these address on the client
@@ -474,8 +473,8 @@ class WireguardUci:
             "server": {
                 "serial_number": CryptoWrapperCmds().get_serial(),
                 "address": self._get_wan_address(),
-                "public-key": WireguardFile.server_pub_content(),
-                "preshared-key": WireguardFile.server_psk_content(),
+                "public_key": WireguardFile.server_pub_content(),
+                "preshared_key": WireguardFile.server_psk_content(),
                 "port": int(
                     get_option_named(uci_data, "network", interface, "listen_port")
                 ),
