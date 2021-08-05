@@ -74,8 +74,8 @@ class WireguardModule(BaseModule):
             self.notify(
                 "remote_import",
                 {
-                    "id": data["client"]["id"],
-                    "serial-number": data["server"]["serial-number"],
+                    "id": data["id"],
+                    "serial_number": data["export"]["server"]["serial_number"],
                 },
             )
         return {"result": res}

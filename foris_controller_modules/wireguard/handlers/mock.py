@@ -29,13 +29,14 @@ logger = logging.getLogger(__name__)
 
 
 class MockWireguardHandler(Handler, BaseMockHandler):
-    clients: typing.Dict[str, dict] = []
+    HOST = "1.2.3.4"
+
+    clients: typing.List[dict] = []
     remotes: typing.List[dict] = []
     ready = False
     server = {
         "enabled": False,
         "port": 51820,
-        "host": "1.2.3.4",
         "networks": ["10.211.211.0/24"],
     }
 
@@ -121,7 +122,7 @@ class MockWireguardHandler(Handler, BaseMockHandler):
                             "public_key": "<public>",
                             "address": "1.2.3.4",  # wan address
                             "port": self.server["port"],
-                            "host": self.server["host"],
+                            "host": self.HOST,
                             "networks": self.server["networks"] + ["192.168.24.1/24"],
                             "dns": [],
                         },
@@ -135,35 +136,34 @@ class MockWireguardHandler(Handler, BaseMockHandler):
         return {"result": False}
 
     @logger_wrapper(logger)
-    def remote_import(self, server, client):
-        if any(
-            e["server"]["serial_number"] == server["serial_number"]
-            for e in self.remotes
-        ):
+    def remote_import(self, id, export):
+        if id in [e["id"] for e in self.remotes] or export["server"][
+            "serial_number"
+        ] in [e["server"]["serial_number"] for e in self.remotes]:
             return False
 
-        self.remotes.push(
-            {
-                "server": server,
-                "client": client,
-            }
+        self.remotes.append(
+            {"id": id, "server": export["server"], "client": export["client"]}
         )
         return True
 
     @logger_wrapper(logger)
-    def remote_del(self, id, serial_number):
-        new_remotes = [
-            e
-            for e in self.remotes
-            if e["id"] == id and e["serial_number"] == serial_number
-        ]
-        if len(new_remotes) == self.self.remotes:
+    def remote_del(self, id):
+        if id not in [e["id"] for e in self.remotes]:
             return False
 
-        self.remotes = new_remotes
+        self.remotes = [e for e in self.remotes if e["id"] != id]
 
         return True
 
     @logger_wrapper(logger)
-    def remote_set(self, *args, **kwargs):
-        raise NotImplementedError()
+    def remote_set(self, id, enabled, networks, server_port, server_address) -> bool:
+        for e in self.remotes:
+            if e["id"] == id:
+                e["enabled"] = enabled
+                e["networks"] = networks
+                e["server_port"] = server_port
+                e["server_address"] = server_address
+                return True
+
+        return False

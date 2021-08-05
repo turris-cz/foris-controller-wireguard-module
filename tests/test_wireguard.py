@@ -372,7 +372,7 @@ def test_remote(infrastructure, network_restart_command):
             "kind": "request",
             "data": {
                 "id": "remote1",
-                "import": client,
+                "export": client,
             },
         }
     )

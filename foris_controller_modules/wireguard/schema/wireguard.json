@@ -502,10 +502,10 @@
                     "type": "object",
                     "properties": {
                         "id": {"$ref": "#/definitions/client_id"},
-                        "import": {"$ref": "#/definitions/client_export"}
+                        "export": {"$ref": "#/definitions/client_export"}
                     },
                     "additionalProperties": false,
-                    "required": ["id", "import"]
+                    "required": ["id", "export"]
                 }
             },
             "additionalProperties": false,
@@ -596,7 +596,7 @@
                         "id": {"$ref": "#/definitions/client_id"}
                     },
                     "additionalProperties": false,
-                    "required": ["id", "serial_number"]
+                    "required": ["id"]
                 }
             },
             "additionalProperties": false,
