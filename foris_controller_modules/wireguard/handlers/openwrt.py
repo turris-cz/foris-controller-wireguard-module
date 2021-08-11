@@ -84,13 +84,13 @@ class OpenwrtWireguardHandler(Handler, BaseOpenwrtHandler):
             return {"result": False}
 
     @logger_wrapper(logger)
-    def remote_import(self, *args, **kwargs):
-        raise NotImplementedError()
+    def remote_import(self, id: str, export: dict) -> bool:
+        return self.uci.remote_import(id, export)
 
     @logger_wrapper(logger)
-    def remote_del(self, *args, **kwargs):
-        raise NotImplementedError()
+    def remote_del(self, id) -> bool:
+        return self.uci.remote_del(id)
 
     @logger_wrapper(logger)
-    def remote_set(self, *args, **kwargs):
-        raise NotImplementedError()
+    def remote_set(self, id, enabled, networks, server_port, server_address) -> bool:
+        return self.uci.remote_set(id, enabled, networks, server_port, server_address)

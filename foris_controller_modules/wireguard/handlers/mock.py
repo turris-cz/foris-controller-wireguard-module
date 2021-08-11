@@ -136,7 +136,7 @@ class MockWireguardHandler(Handler, BaseMockHandler):
         return {"result": False}
 
     @logger_wrapper(logger)
-    def remote_import(self, id, export):
+    def remote_import(self, id, export) -> bool:
         if id in [e["id"] for e in self.remotes] or export["server"][
             "serial_number"
         ] in [e["server"]["serial_number"] for e in self.remotes]:

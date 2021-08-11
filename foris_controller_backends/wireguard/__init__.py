@@ -19,11 +19,9 @@
 
 import ipaddress
 import itertools
-import json
 import logging
 import os
 import pathlib
-import re
 import typing
 
 from foris_controller.app import app_info
@@ -324,10 +322,71 @@ class WireguardUci:
         MaintainCommands().restart_network()
         return True
 
-    def add_wireguard_remote(self):
-        # TODO create interface similary to when the server is starting
+    def remote_import(self, id: str, export: dict) -> bool:
         # add private key obtained from the server
-        pass
+        with UciBackend() as backend:
+            data = backend.read("network")
+            new_section = f"wg_{export['server']['serial_number']}"
+            if section_exists(data, "network", new_section):
+                return False
+
+            # update client part
+            backend.add_section("network", "interface", new_section)
+            backend.set_option("network", new_section, "disabled", store_bool(False))
+            backend.set_option("network", new_section, "proto", "wireguard")
+            backend.set_option(
+                "network", new_section, "private_key", export["client"]["private_key"]
+            )
+            backend.replace_list(
+                "network", new_section, "addresses", export["client"]["addresses"]
+            )
+
+            # update server part
+            server_section_type = f"wireguard_{new_section}"
+            cli_name = f"wgclient_{id}"
+            if section_exists(data, "network", cli_name):
+                return False
+            backend.add_section("network", server_section_type, cli_name)
+            backend.set_option(
+                "network", cli_name, "public_key", export["server"]["public_key"]
+            )
+            backend.set_option(
+                "network",
+                new_section,
+                "preshared_key",
+                export["server"]["preshared_key"],
+            )
+            backend.set_option(
+                "network", cli_name, "endpoint_host", export["server"]["host"]  # tod
+            )
+            backend.set_option(
+                "network", cli_name, "endpoint_port", export["server"]["port"]
+            )
+            backend.set_option(
+                "network", cli_name, "route_allowed_ips", store_bool(True)
+            )
+            backend.set_option(
+                "network", cli_name, "persistent_keepalive", "25"  # see openwrt docs
+            )
+            backend.replace_list(
+                "network",
+                cli_name,
+                "allowed_ips",
+                export["server"]["networks"],
+            )
+
+        MaintainCommands().restart_network()
+
+        return True
+
+    def remote_del(self, id: str) -> bool:
+        # TODO obtain serial from wgclient_{id} type
+        # TODO remove wgclient_{id}
+        # TODO remove wg_{serial_number}
+        raise NotImplementedError()
+
+    def remote_set(self, id, enabled, networks, server_port, server_address) -> bool:
+        raise NotImplementedError()
 
     @staticmethod
     def _get_lan_addresses(network_config) -> ipaddress.IPv4Interface:
